@@ -557,3 +557,730 @@ export const GetAuditLogResponse = zod.object({
 })
 
 
+/**
+ * @summary List trainings visible to the current user
+ */
+export const listTrainingsQueryPageDefault = 1;
+export const listTrainingsQueryLimitDefault = 20;
+
+export const ListTrainingsQueryParams = zod.object({
+  "page": zod.coerce.number().default(listTrainingsQueryPageDefault),
+  "limit": zod.coerce.number().default(listTrainingsQueryLimitDefault)
+})
+
+export const ListTrainingsResponse = zod.object({
+  "trainings": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "estimatedDurationMinutes": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Create a new training (training_lead+)
+ */
+export const CreateTrainingBody = zod.object({
+  "title": zod.string(),
+  "description": zod.string().optional(),
+  "estimatedDurationMinutes": zod.number().optional()
+})
+
+
+/**
+ * @summary Get a training with its content items
+ */
+export const GetTrainingParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const GetTrainingResponse = zod.object({
+  "training": zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "estimatedDurationMinutes": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "content": zod.array(zod.object({
+  "id": zod.string(),
+  "trainingId": zod.string(),
+  "type": zod.enum(['scorm', 'youtube', 'slides', 'pptx']),
+  "title": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "filePath": zod.string().nullish(),
+  "displayOrder": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Update a training (training_lead+)
+ */
+export const UpdateTrainingParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const UpdateTrainingBody = zod.object({
+  "title": zod.string().optional(),
+  "description": zod.string().optional(),
+  "estimatedDurationMinutes": zod.number().optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateTrainingResponse = zod.object({
+  "training": zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "estimatedDurationMinutes": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+})
+
+
+/**
+ * @summary Soft-delete a training (training_lead+)
+ */
+export const DeleteTrainingParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const DeleteTrainingResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Add a YouTube or Slides URL content item (training_lead+)
+ */
+export const AddTrainingContentParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const AddTrainingContentBody = zod.object({
+  "type": zod.enum(['youtube', 'slides']),
+  "title": zod.string().optional(),
+  "url": zod.string(),
+  "displayOrder": zod.number().optional()
+})
+
+
+/**
+ * @summary Upload a SCORM package ZIP file (training_lead+)
+ */
+export const UploadScormParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const UploadScormBody = zod.object({
+  "file": zod.instanceof(File)
+})
+
+
+/**
+ * @summary Upload a PowerPoint (.pptx) file (training_lead+)
+ */
+export const UploadPptxParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const UploadPptxBody = zod.object({
+  "file": zod.instanceof(File)
+})
+
+
+/**
+ * @summary Delete a training content item (training_lead+)
+ */
+export const DeleteTrainingContentParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID'),
+  "contentId": zod.coerce.string()
+})
+
+export const DeleteTrainingContentResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Record SCORM completion event
+ */
+export const ScormCompleteParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const ScormCompleteBody = zod.object({
+  "score": zod.number().optional()
+})
+
+export const ScormCompleteResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary List group assignments for a training (training_lead+)
+ */
+export const ListTrainingAssignmentsParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const ListTrainingAssignmentsResponse = zod.object({
+  "assignments": zod.array(zod.object({
+  "id": zod.string(),
+  "trainingId": zod.string(),
+  "groupId": zod.string(),
+  "dueDate": zod.coerce.date().nullish(),
+  "assignedBy": zod.string().nullish(),
+  "assignedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Assign a training to a group (admin only)
+ */
+export const AssignTrainingToGroupParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const AssignTrainingToGroupBody = zod.object({
+  "groupId": zod.string(),
+  "dueDate": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Remove a training group assignment (admin only)
+ */
+export const UnassignTrainingFromGroupParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID'),
+  "assignmentId": zod.coerce.string()
+})
+
+export const UnassignTrainingFromGroupResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get the quiz for a training (correct answers hidden for learners)
+ */
+export const GetQuizParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const GetQuizResponse = zod.object({
+  "quiz": zod.object({
+  "id": zod.string(),
+  "trainingId": zod.string(),
+  "title": zod.string(),
+  "passingScore": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "questions": zod.array(zod.object({
+  "id": zod.string(),
+  "quizId": zod.string(),
+  "question": zod.string(),
+  "options": zod.array(zod.string()),
+  "correctAnswerIndex": zod.number().optional().describe('Only returned for training leads and admins'),
+  "displayOrder": zod.number(),
+  "createdAt": zod.coerce.date().optional()
+}))
+})
+
+
+/**
+ * @summary Create a quiz for a training (training_lead+)
+ */
+export const CreateQuizParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const createQuizBodyPassingScoreDefault = 70;
+
+export const CreateQuizBody = zod.object({
+  "title": zod.string(),
+  "passingScore": zod.number().default(createQuizBodyPassingScoreDefault)
+})
+
+
+/**
+ * @summary Update quiz settings (training_lead+)
+ */
+export const UpdateQuizParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const UpdateQuizBody = zod.object({
+  "title": zod.string().optional(),
+  "passingScore": zod.number().optional()
+})
+
+export const UpdateQuizResponse = zod.object({
+  "quiz": zod.object({
+  "id": zod.string(),
+  "trainingId": zod.string(),
+  "title": zod.string(),
+  "passingScore": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+})
+
+
+/**
+ * @summary Delete a quiz (training_lead+)
+ */
+export const DeleteQuizParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const DeleteQuizResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Add a question to the quiz (training_lead+)
+ */
+export const CreateQuizQuestionParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const createQuizQuestionBodyOptionsMin = 2;
+
+
+
+export const CreateQuizQuestionBody = zod.object({
+  "question": zod.string(),
+  "options": zod.array(zod.string()).min(createQuizQuestionBodyOptionsMin),
+  "correctAnswerIndex": zod.number(),
+  "displayOrder": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a quiz question (training_lead+)
+ */
+export const UpdateQuizQuestionParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID'),
+  "questionId": zod.coerce.string()
+})
+
+export const UpdateQuizQuestionBody = zod.object({
+  "question": zod.string().optional(),
+  "options": zod.array(zod.string()).optional(),
+  "correctAnswerIndex": zod.number().optional(),
+  "displayOrder": zod.number().optional()
+})
+
+export const UpdateQuizQuestionResponse = zod.object({
+  "question": zod.object({
+  "id": zod.string(),
+  "quizId": zod.string(),
+  "question": zod.string(),
+  "options": zod.array(zod.string()),
+  "correctAnswerIndex": zod.number().optional().describe('Only returned for training leads and admins'),
+  "displayOrder": zod.number(),
+  "createdAt": zod.coerce.date().optional()
+})
+})
+
+
+/**
+ * @summary Delete a quiz question (training_lead+)
+ */
+export const DeleteQuizQuestionParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID'),
+  "questionId": zod.coerce.string()
+})
+
+export const DeleteQuizQuestionResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Submit quiz answers and get a score
+ */
+export const SubmitQuizParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const SubmitQuizBody = zod.object({
+  "answers": zod.array(zod.number())
+})
+
+export const SubmitQuizResponse = zod.object({
+  "attempt": zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "quizId": zod.string(),
+  "answers": zod.array(zod.number()),
+  "score": zod.number(),
+  "passed": zod.boolean(),
+  "completedAt": zod.coerce.date()
+}),
+  "score": zod.number(),
+  "passed": zod.boolean(),
+  "passingScore": zod.number()
+})
+
+
+/**
+ * @summary List quiz attempts for the current user
+ */
+export const ListQuizAttemptsParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID')
+})
+
+export const ListQuizAttemptsResponse = zod.object({
+  "attempts": zod.array(zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "quizId": zod.string(),
+  "answers": zod.array(zod.number()),
+  "score": zod.number(),
+  "passed": zod.boolean(),
+  "completedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary List events visible to the current user
+ */
+export const listEventsQueryPageDefault = 1;
+export const listEventsQueryLimitDefault = 20;
+
+export const ListEventsQueryParams = zod.object({
+  "page": zod.coerce.number().default(listEventsQueryPageDefault),
+  "limit": zod.coerce.number().default(listEventsQueryLimitDefault)
+})
+
+export const ListEventsResponse = zod.object({
+  "events": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "estimatedDurationMinutes": zod.number().nullish(),
+  "maxCapacity": zod.number().nullish(),
+  "attendanceCode": zod.string().nullish().describe('Only visible to training leads and admins'),
+  "attendanceCodeExpiresAt": zod.coerce.date().nullish(),
+  "isActive": zod.boolean(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Create an in-person event (training_lead+)
+ */
+export const CreateEventBody = zod.object({
+  "title": zod.string(),
+  "description": zod.string().optional(),
+  "location": zod.string().optional(),
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "estimatedDurationMinutes": zod.number().optional(),
+  "maxCapacity": zod.number().optional()
+})
+
+
+/**
+ * @summary Get event details with registrations and attendance
+ */
+export const GetEventParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const GetEventResponse = zod.object({
+  "event": zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "estimatedDurationMinutes": zod.number().nullish(),
+  "maxCapacity": zod.number().nullish(),
+  "attendanceCode": zod.string().nullish().describe('Only visible to training leads and admins'),
+  "attendanceCodeExpiresAt": zod.coerce.date().nullish(),
+  "isActive": zod.boolean(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "registrations": zod.array(zod.object({
+  "id": zod.string(),
+  "eventId": zod.string(),
+  "userId": zod.string(),
+  "assignedBy": zod.string().nullish(),
+  "registeredAt": zod.coerce.date()
+})),
+  "attendance": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
+
+/**
+ * @summary Update an event (training_lead+)
+ */
+export const UpdateEventParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const UpdateEventBody = zod.object({
+  "title": zod.string().optional(),
+  "description": zod.string().optional(),
+  "location": zod.string().optional(),
+  "startAt": zod.coerce.date().optional(),
+  "endAt": zod.coerce.date().optional(),
+  "estimatedDurationMinutes": zod.number().optional(),
+  "maxCapacity": zod.number().optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateEventResponse = zod.object({
+  "event": zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "estimatedDurationMinutes": zod.number().nullish(),
+  "maxCapacity": zod.number().nullish(),
+  "attendanceCode": zod.string().nullish().describe('Only visible to training leads and admins'),
+  "attendanceCodeExpiresAt": zod.coerce.date().nullish(),
+  "isActive": zod.boolean(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+})
+
+
+/**
+ * @summary Soft-delete an event (training_lead+)
+ */
+export const DeleteEventParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const DeleteEventResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Self-register for an event
+ */
+export const RegisterForEventParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+
+/**
+ * @summary Assign a user to an event (training_lead+)
+ */
+export const AssignUserToEventParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const AssignUserToEventBody = zod.object({
+  "userId": zod.string()
+})
+
+
+/**
+ * @summary Unregister a user from an event
+ */
+export const UnregisterFromEventParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID'),
+  "userId": zod.coerce.string()
+})
+
+export const UnregisterFromEventResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Generate a one-time attendance code (training_lead+)
+ */
+export const GenerateAttendanceCodeParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const generateAttendanceCodeBodyExpiresInMinutesDefault = 60;
+
+export const GenerateAttendanceCodeBody = zod.object({
+  "expiresInMinutes": zod.number().default(generateAttendanceCodeBodyExpiresInMinutesDefault)
+})
+
+export const GenerateAttendanceCodeResponse = zod.object({
+  "code": zod.string(),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Submit an attendance code to mark self as attended
+ */
+export const SubmitAttendanceCodeParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const SubmitAttendanceCodeBody = zod.object({
+  "code": zod.string()
+})
+
+export const SubmitAttendanceCodeResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Manually mark a user as attended/not attended (training_lead+)
+ */
+export const ManualMarkAttendanceParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID'),
+  "userId": zod.coerce.string()
+})
+
+export const manualMarkAttendanceBodyAttendedDefault = true;
+
+export const ManualMarkAttendanceBody = zod.object({
+  "attended": zod.boolean().default(manualMarkAttendanceBodyAttendedDefault)
+})
+
+export const ManualMarkAttendanceResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Mark all registered users as attended (training_lead+)
+ */
+export const BulkMarkAttendanceParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const BulkMarkAttendanceResponse = zod.object({
+  "success": zod.boolean(),
+  "marked": zod.number()
+})
+
+
+/**
+ * @summary List group assignments for an event (training_lead+)
+ */
+export const ListEventAssignmentsParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const ListEventAssignmentsResponse = zod.object({
+  "assignments": zod.array(zod.object({
+  "id": zod.string(),
+  "eventId": zod.string(),
+  "groupId": zod.string(),
+  "assignedBy": zod.string().nullish(),
+  "assignedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Assign an event to a group (admin only)
+ */
+export const AssignEventToGroupParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID')
+})
+
+export const AssignEventToGroupBody = zod.object({
+  "groupId": zod.string(),
+  "dueDate": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Remove an event group assignment (admin only)
+ */
+export const UnassignEventFromGroupParams = zod.object({
+  "id": zod.coerce.string().describe('Event UUID'),
+  "assignmentId": zod.coerce.string()
+})
+
+export const UnassignEventFromGroupResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get completion history for a user
+ */
+export const GetUserCompletionsParams = zod.object({
+  "id": zod.coerce.string().describe('User UUID')
+})
+
+export const GetUserCompletionsResponse = zod.object({
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "trainingId": zod.string().nullish(),
+  "eventId": zod.string().nullish(),
+  "durationMinutes": zod.number().nullish(),
+  "score": zod.number().nullish(),
+  "completedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "trainingTitle": zod.string().nullish(),
+  "eventTitle": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary List all completion records (training_lead+)
+ */
+export const ListAllCompletionsResponse = zod.object({
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "trainingId": zod.string().nullish(),
+  "eventId": zod.string().nullish(),
+  "durationMinutes": zod.number().nullish(),
+  "score": zod.number().nullish(),
+  "completedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "trainingTitle": zod.string().nullish(),
+  "eventTitle": zod.string().nullish()
+}))
+})
+
+

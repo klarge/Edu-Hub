@@ -6,3 +6,8 @@ export * from "./authProviders";
 export * from "./appSettings";
 export * from "./auditLog";
 export * from "./apiKeys";
+export * from "./trainings";
+export * from "./quizzes";
+export * from "./events";
+export * from "./assignments";
+export * from "./completions";

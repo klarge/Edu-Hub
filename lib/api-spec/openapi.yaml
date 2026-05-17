@@ -18,6 +18,12 @@ tags:
     description: Tag group management
   - name: settings
     description: Application settings
+  - name: trainings
+    description: Online training management
+  - name: events
+    description: In-person event management
+  - name: completions
+    description: Completion records
 
 paths:
   /healthz:
@@ -798,6 +804,961 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditLogResponse"
 
+  # ─── Trainings ───────────────────────────────────────────────────────────────
+
+  /trainings:
+    get:
+      operationId: listTrainings
+      tags: [trainings]
+      summary: List trainings visible to the current user
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of trainings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedTrainings"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createTraining
+      tags: [trainings]
+      summary: Create a new training (training_lead+)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTrainingRequest"
+      responses:
+        "201":
+          description: Training created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trainings/{id}:
+    get:
+      operationId: getTraining
+      tags: [trainings]
+      summary: Get a training with its content items
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      responses:
+        "200":
+          description: Training detail with content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingDetailResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateTraining
+      tags: [trainings]
+      summary: Update a training (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTrainingRequest"
+      responses:
+        "200":
+          description: Updated training
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteTraining
+      tags: [trainings]
+      summary: Soft-delete a training (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      responses:
+        "200":
+          description: Training deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trainings/{id}/content:
+    post:
+      operationId: addTrainingContent
+      tags: [trainings]
+      summary: Add a YouTube or Slides URL content item (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTrainingContentRequest"
+      responses:
+        "201":
+          description: Content item added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingContentResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trainings/{id}/content/scorm:
+    post:
+      operationId: uploadScorm
+      tags: [trainings]
+      summary: Upload a SCORM package ZIP file (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: SCORM content uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingContentResponse"
+        "400":
+          description: Invalid file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trainings/{id}/content/pptx:
+    post:
+      operationId: uploadPptx
+      tags: [trainings]
+      summary: Upload a PowerPoint (.pptx) file (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: PPTX content uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingContentResponse"
+        "400":
+          description: Invalid file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trainings/{id}/content/{contentId}:
+    delete:
+      operationId: deleteTrainingContent
+      tags: [trainings]
+      summary: Delete a training content item (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+        - in: path
+          name: contentId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Content deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /trainings/{id}/scorm-complete:
+    post:
+      operationId: scormComplete
+      tags: [trainings]
+      summary: Record SCORM completion event
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score:
+                  type: integer
+      responses:
+        "200":
+          description: Completion recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /trainings/{id}/assignments:
+    get:
+      operationId: listTrainingAssignments
+      tags: [trainings]
+      summary: List group assignments for a training (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      responses:
+        "200":
+          description: List of group assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingAssignmentListResponse"
+
+    post:
+      operationId: assignTrainingToGroup
+      tags: [trainings]
+      summary: Assign a training to a group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignToGroupRequest"
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingAssignmentResponse"
+        "409":
+          description: Already assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trainings/{id}/assignments/{assignmentId}:
+    delete:
+      operationId: unassignTrainingFromGroup
+      tags: [trainings]
+      summary: Remove a training group assignment (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+        - in: path
+          name: assignmentId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Assignment removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─── Quizzes ─────────────────────────────────────────────────────────────────
+
+  /trainings/{id}/quiz:
+    get:
+      operationId: getQuiz
+      tags: [trainings]
+      summary: Get the quiz for a training (correct answers hidden for learners)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      responses:
+        "200":
+          description: Quiz with questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizDetailResponse"
+        "404":
+          description: No quiz found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createQuiz
+      tags: [trainings]
+      summary: Create a quiz for a training (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuizRequest"
+      responses:
+        "201":
+          description: Quiz created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizResponse"
+        "409":
+          description: Quiz already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateQuiz
+      tags: [trainings]
+      summary: Update quiz settings (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQuizRequest"
+      responses:
+        "200":
+          description: Updated quiz
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizResponse"
+
+    delete:
+      operationId: deleteQuiz
+      tags: [trainings]
+      summary: Delete a quiz (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      responses:
+        "200":
+          description: Quiz deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /trainings/{id}/quiz/questions:
+    post:
+      operationId: createQuizQuestion
+      tags: [trainings]
+      summary: Add a question to the quiz (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuizQuestionRequest"
+      responses:
+        "201":
+          description: Question created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizQuestionResponse"
+
+  /trainings/{id}/quiz/questions/{questionId}:
+    put:
+      operationId: updateQuizQuestion
+      tags: [trainings]
+      summary: Update a quiz question (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+        - in: path
+          name: questionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQuizQuestionRequest"
+      responses:
+        "200":
+          description: Updated question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizQuestionResponse"
+
+    delete:
+      operationId: deleteQuizQuestion
+      tags: [trainings]
+      summary: Delete a quiz question (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+        - in: path
+          name: questionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Question deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /trainings/{id}/quiz/submit:
+    post:
+      operationId: submitQuiz
+      tags: [trainings]
+      summary: Submit quiz answers and get a score
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizSubmitRequest"
+      responses:
+        "200":
+          description: Quiz attempt result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSubmitResponse"
+
+  /trainings/{id}/quiz/attempts:
+    get:
+      operationId: listQuizAttempts
+      tags: [trainings]
+      summary: List quiz attempts for the current user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+      responses:
+        "200":
+          description: List of quiz attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizAttemptListResponse"
+
+  # ─── Events ──────────────────────────────────────────────────────────────────
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List events visible to the current user
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedEvents"
+
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create an in-person event (training_lead+)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event details with registrations and attendance
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Event detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetailResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update an event (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEventRequest"
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Soft-delete an event (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Event deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /events/{id}/register:
+    post:
+      operationId: registerForEvent
+      tags: [events]
+      summary: Self-register for an event
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventRegistrationResponse"
+        "409":
+          description: Already registered or full capacity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/{id}/assign:
+    post:
+      operationId: assignUserToEvent
+      tags: [events]
+      summary: Assign a user to an event (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+      responses:
+        "201":
+          description: User assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventRegistrationResponse"
+        "409":
+          description: Already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/{id}/registrations/{userId}:
+    delete:
+      operationId: unregisterFromEvent
+      tags: [events]
+      summary: Unregister a user from an event
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unregistered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /events/{id}/attendance-code:
+    post:
+      operationId: generateAttendanceCode
+      tags: [events]
+      summary: Generate a one-time attendance code (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresInMinutes:
+                  type: integer
+                  default: 60
+      responses:
+        "200":
+          description: Attendance code generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceCodeResponse"
+
+  /events/{id}/attend:
+    post:
+      operationId: submitAttendanceCode
+      tags: [events]
+      summary: Submit an attendance code to mark self as attended
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: Attendance recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/{id}/attendance/{userId}/mark:
+    post:
+      operationId: manualMarkAttendance
+      tags: [events]
+      summary: Manually mark a user as attended/not attended (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                attended:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: Attendance updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /events/{id}/attendance/bulk-mark:
+    post:
+      operationId: bulkMarkAttendance
+      tags: [events]
+      summary: Mark all registered users as attended (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Bulk attendance marked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkMarkAttendanceResponse"
+
+  /events/{id}/assignments:
+    get:
+      operationId: listEventAssignments
+      tags: [events]
+      summary: List group assignments for an event (training_lead+)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: List of group assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAssignmentListResponse"
+
+    post:
+      operationId: assignEventToGroup
+      tags: [events]
+      summary: Assign an event to a group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignToGroupRequest"
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAssignmentResponse"
+        "409":
+          description: Already assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/{id}/assignments/{assignmentId}:
+    delete:
+      operationId: unassignEventFromGroup
+      tags: [events]
+      summary: Remove an event group assignment (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - in: path
+          name: assignmentId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Assignment removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─── Completions ─────────────────────────────────────────────────────────────
+
+  /users/{id}/completions:
+    get:
+      operationId: getUserCompletions
+      tags: [completions]
+      summary: Get completion history for a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Completion records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletionListResponse"
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /completions:
+    get:
+      operationId: listAllCompletions
+      tags: [completions]
+      summary: List all completion records (training_lead+)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: All completion records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletionListResponse"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -826,6 +1787,20 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/AuthProviderType"
+    TrainingId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Training UUID
+    EventId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Event UUID
 
   schemas:
     HealthStatus:
@@ -1332,3 +2307,605 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamCompletionUser"
+
+    # ─── Training schemas ─────────────────────────────────────────────────────
+
+    TrainingContentType:
+      type: string
+      enum: [scorm, youtube, slides, pptx]
+
+    Training:
+      type: object
+      required: [id, title, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        estimatedDurationMinutes:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        createdBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TrainingContent:
+      type: object
+      required: [id, trainingId, type, createdAt]
+      properties:
+        id:
+          type: string
+        trainingId:
+          type: string
+        type:
+          $ref: "#/components/schemas/TrainingContentType"
+        title:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        filePath:
+          type: string
+          nullable: true
+        displayOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    TrainingGroupAssignment:
+      type: object
+      required: [id, trainingId, groupId, assignedAt]
+      properties:
+        id:
+          type: string
+        trainingId:
+          type: string
+        groupId:
+          type: string
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+        assignedBy:
+          type: string
+          nullable: true
+        assignedAt:
+          type: string
+          format: date-time
+
+    Quiz:
+      type: object
+      required: [id, trainingId, title, passingScore, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        trainingId:
+          type: string
+        title:
+          type: string
+        passingScore:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    QuizQuestion:
+      type: object
+      required: [id, quizId, question, options, displayOrder]
+      properties:
+        id:
+          type: string
+        quizId:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctAnswerIndex:
+          type: integer
+          description: Only returned for training leads and admins
+        displayOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    QuizAttempt:
+      type: object
+      required: [id, userId, quizId, answers, score, passed, completedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        quizId:
+          type: string
+        answers:
+          type: array
+          items:
+            type: integer
+        score:
+          type: integer
+        passed:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+
+    # ─── Event schemas ────────────────────────────────────────────────────────
+
+    Event:
+      type: object
+      required: [id, title, startAt, endAt, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        estimatedDurationMinutes:
+          type: integer
+          nullable: true
+        maxCapacity:
+          type: integer
+          nullable: true
+        attendanceCode:
+          type: string
+          nullable: true
+          description: Only visible to training leads and admins
+        attendanceCodeExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        isActive:
+          type: boolean
+        createdBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EventRegistration:
+      type: object
+      required: [id, eventId, userId, registeredAt]
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        userId:
+          type: string
+        assignedBy:
+          type: string
+          nullable: true
+        registeredAt:
+          type: string
+          format: date-time
+
+    EventGroupAssignment:
+      type: object
+      required: [id, eventId, groupId, assignedAt]
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        groupId:
+          type: string
+        assignedBy:
+          type: string
+          nullable: true
+        assignedAt:
+          type: string
+          format: date-time
+
+    # ─── Completion schemas ───────────────────────────────────────────────────
+
+    CompletionRecord:
+      type: object
+      required: [id, userId, completedAt, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        trainingId:
+          type: string
+          nullable: true
+        eventId:
+          type: string
+          nullable: true
+        durationMinutes:
+          type: integer
+          nullable: true
+        score:
+          type: integer
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        trainingTitle:
+          type: string
+          nullable: true
+        eventTitle:
+          type: string
+          nullable: true
+
+    # ─── Request bodies ───────────────────────────────────────────────────────
+
+    CreateTrainingRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        estimatedDurationMinutes:
+          type: integer
+
+    UpdateTrainingRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        estimatedDurationMinutes:
+          type: integer
+        isActive:
+          type: boolean
+
+    AddTrainingContentRequest:
+      type: object
+      required: [type, url]
+      properties:
+        type:
+          type: string
+          enum: [youtube, slides]
+        title:
+          type: string
+        url:
+          type: string
+        displayOrder:
+          type: integer
+
+    AssignToGroupRequest:
+      type: object
+      required: [groupId]
+      properties:
+        groupId:
+          type: string
+        dueDate:
+          type: string
+          format: date-time
+
+    CreateQuizRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        passingScore:
+          type: integer
+          default: 70
+
+    UpdateQuizRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        passingScore:
+          type: integer
+
+    CreateQuizQuestionRequest:
+      type: object
+      required: [question, options, correctAnswerIndex]
+      properties:
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+          minItems: 2
+        correctAnswerIndex:
+          type: integer
+        displayOrder:
+          type: integer
+
+    UpdateQuizQuestionRequest:
+      type: object
+      properties:
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctAnswerIndex:
+          type: integer
+        displayOrder:
+          type: integer
+
+    QuizSubmitRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: integer
+
+    CreateEventRequest:
+      type: object
+      required: [title, startAt, endAt]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        estimatedDurationMinutes:
+          type: integer
+        maxCapacity:
+          type: integer
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        estimatedDurationMinutes:
+          type: integer
+        maxCapacity:
+          type: integer
+        isActive:
+          type: boolean
+
+    # ─── Response wrappers ────────────────────────────────────────────────────
+
+    TrainingResponse:
+      type: object
+      required: [training]
+      properties:
+        training:
+          $ref: "#/components/schemas/Training"
+
+    TrainingDetailResponse:
+      type: object
+      required: [training, content]
+      properties:
+        training:
+          $ref: "#/components/schemas/Training"
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrainingContent"
+
+    TrainingContentResponse:
+      type: object
+      required: [content]
+      properties:
+        content:
+          $ref: "#/components/schemas/TrainingContent"
+
+    PaginatedTrainings:
+      type: object
+      required: [trainings, total, page, limit]
+      properties:
+        trainings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Training"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    TrainingAssignmentResponse:
+      type: object
+      required: [assignment]
+      properties:
+        assignment:
+          $ref: "#/components/schemas/TrainingGroupAssignment"
+
+    TrainingAssignmentListResponse:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrainingGroupAssignment"
+
+    QuizResponse:
+      type: object
+      required: [quiz]
+      properties:
+        quiz:
+          $ref: "#/components/schemas/Quiz"
+
+    QuizDetailResponse:
+      type: object
+      required: [quiz, questions]
+      properties:
+        quiz:
+          $ref: "#/components/schemas/Quiz"
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizQuestion"
+
+    QuizQuestionResponse:
+      type: object
+      required: [question]
+      properties:
+        question:
+          $ref: "#/components/schemas/QuizQuestion"
+
+    QuizSubmitResponse:
+      type: object
+      required: [attempt, score, passed, passingScore]
+      properties:
+        attempt:
+          $ref: "#/components/schemas/QuizAttempt"
+        score:
+          type: integer
+        passed:
+          type: boolean
+        passingScore:
+          type: integer
+
+    QuizAttemptListResponse:
+      type: object
+      required: [attempts]
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizAttempt"
+
+    EventResponse:
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: "#/components/schemas/Event"
+
+    EventDetailResponse:
+      type: object
+      required: [event, registrations, attendance]
+      properties:
+        event:
+          $ref: "#/components/schemas/Event"
+        registrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventRegistration"
+        attendance:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    PaginatedEvents:
+      type: object
+      required: [events, total, page, limit]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    EventRegistrationResponse:
+      type: object
+      required: [registration]
+      properties:
+        registration:
+          $ref: "#/components/schemas/EventRegistration"
+
+    AttendanceCodeResponse:
+      type: object
+      required: [code, expiresAt]
+      properties:
+        code:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    BulkMarkAttendanceResponse:
+      type: object
+      required: [success, marked]
+      properties:
+        success:
+          type: boolean
+        marked:
+          type: integer
+
+    EventAssignmentResponse:
+      type: object
+      required: [assignment]
+      properties:
+        assignment:
+          $ref: "#/components/schemas/EventGroupAssignment"
+
+    EventAssignmentListResponse:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventGroupAssignment"
+
+    CompletionListResponse:
+      type: object
+      required: [completions]
+      properties:
+        completions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompletionRecord"

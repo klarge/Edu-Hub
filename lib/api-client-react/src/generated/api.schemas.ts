@@ -296,6 +296,304 @@ export interface TeamCompletionResponse {
   users: TeamCompletionUser[];
 }
 
+export type TrainingContentType = typeof TrainingContentType[keyof typeof TrainingContentType];
+
+
+export const TrainingContentType = {
+  scorm: 'scorm',
+  youtube: 'youtube',
+  slides: 'slides',
+  pptx: 'pptx',
+} as const;
+
+export interface Training {
+  id: string;
+  title: string;
+  description?: string | null;
+  estimatedDurationMinutes?: number | null;
+  isActive: boolean;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TrainingContent {
+  id: string;
+  trainingId: string;
+  type: TrainingContentType;
+  title?: string | null;
+  url?: string | null;
+  filePath?: string | null;
+  displayOrder?: number;
+  createdAt: string;
+}
+
+export interface TrainingGroupAssignment {
+  id: string;
+  trainingId: string;
+  groupId: string;
+  dueDate?: string | null;
+  assignedBy?: string | null;
+  assignedAt: string;
+}
+
+export interface Quiz {
+  id: string;
+  trainingId: string;
+  title: string;
+  passingScore: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  quizId: string;
+  question: string;
+  options: string[];
+  /** Only returned for training leads and admins */
+  correctAnswerIndex?: number;
+  displayOrder: number;
+  createdAt?: string;
+}
+
+export interface QuizAttempt {
+  id: string;
+  userId: string;
+  quizId: string;
+  answers: number[];
+  score: number;
+  passed: boolean;
+  completedAt: string;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  startAt: string;
+  endAt: string;
+  estimatedDurationMinutes?: number | null;
+  maxCapacity?: number | null;
+  /** Only visible to training leads and admins */
+  attendanceCode?: string | null;
+  attendanceCodeExpiresAt?: string | null;
+  isActive: boolean;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  userId: string;
+  assignedBy?: string | null;
+  registeredAt: string;
+}
+
+export interface EventGroupAssignment {
+  id: string;
+  eventId: string;
+  groupId: string;
+  assignedBy?: string | null;
+  assignedAt: string;
+}
+
+export interface CompletionRecord {
+  id: string;
+  userId: string;
+  trainingId?: string | null;
+  eventId?: string | null;
+  durationMinutes?: number | null;
+  score?: number | null;
+  completedAt: string;
+  createdAt: string;
+  trainingTitle?: string | null;
+  eventTitle?: string | null;
+}
+
+export interface CreateTrainingRequest {
+  title: string;
+  description?: string;
+  estimatedDurationMinutes?: number;
+}
+
+export interface UpdateTrainingRequest {
+  title?: string;
+  description?: string;
+  estimatedDurationMinutes?: number;
+  isActive?: boolean;
+}
+
+export type AddTrainingContentRequestType = typeof AddTrainingContentRequestType[keyof typeof AddTrainingContentRequestType];
+
+
+export const AddTrainingContentRequestType = {
+  youtube: 'youtube',
+  slides: 'slides',
+} as const;
+
+export interface AddTrainingContentRequest {
+  type: AddTrainingContentRequestType;
+  title?: string;
+  url: string;
+  displayOrder?: number;
+}
+
+export interface AssignToGroupRequest {
+  groupId: string;
+  dueDate?: string;
+}
+
+export interface CreateQuizRequest {
+  title: string;
+  passingScore?: number;
+}
+
+export interface UpdateQuizRequest {
+  title?: string;
+  passingScore?: number;
+}
+
+export interface CreateQuizQuestionRequest {
+  question: string;
+  /** @minItems 2 */
+  options: string[];
+  correctAnswerIndex: number;
+  displayOrder?: number;
+}
+
+export interface UpdateQuizQuestionRequest {
+  question?: string;
+  options?: string[];
+  correctAnswerIndex?: number;
+  displayOrder?: number;
+}
+
+export interface QuizSubmitRequest {
+  answers: number[];
+}
+
+export interface CreateEventRequest {
+  title: string;
+  description?: string;
+  location?: string;
+  startAt: string;
+  endAt: string;
+  estimatedDurationMinutes?: number;
+  maxCapacity?: number;
+}
+
+export interface UpdateEventRequest {
+  title?: string;
+  description?: string;
+  location?: string;
+  startAt?: string;
+  endAt?: string;
+  estimatedDurationMinutes?: number;
+  maxCapacity?: number;
+  isActive?: boolean;
+}
+
+export interface TrainingResponse {
+  training: Training;
+}
+
+export interface TrainingDetailResponse {
+  training: Training;
+  content: TrainingContent[];
+}
+
+export interface TrainingContentResponse {
+  content: TrainingContent;
+}
+
+export interface PaginatedTrainings {
+  trainings: Training[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface TrainingAssignmentResponse {
+  assignment: TrainingGroupAssignment;
+}
+
+export interface TrainingAssignmentListResponse {
+  assignments: TrainingGroupAssignment[];
+}
+
+export interface QuizResponse {
+  quiz: Quiz;
+}
+
+export interface QuizDetailResponse {
+  quiz: Quiz;
+  questions: QuizQuestion[];
+}
+
+export interface QuizQuestionResponse {
+  question: QuizQuestion;
+}
+
+export interface QuizSubmitResponse {
+  attempt: QuizAttempt;
+  score: number;
+  passed: boolean;
+  passingScore: number;
+}
+
+export interface QuizAttemptListResponse {
+  attempts: QuizAttempt[];
+}
+
+export interface EventResponse {
+  event: Event;
+}
+
+export type EventDetailResponseAttendanceItem = { [key: string]: unknown };
+
+export interface EventDetailResponse {
+  event: Event;
+  registrations: EventRegistration[];
+  attendance: EventDetailResponseAttendanceItem[];
+}
+
+export interface PaginatedEvents {
+  events: Event[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface EventRegistrationResponse {
+  registration: EventRegistration;
+}
+
+export interface AttendanceCodeResponse {
+  code: string;
+  expiresAt: string;
+}
+
+export interface BulkMarkAttendanceResponse {
+  success: boolean;
+  marked: number;
+}
+
+export interface EventAssignmentResponse {
+  assignment: EventGroupAssignment;
+}
+
+export interface EventAssignmentListResponse {
+  assignments: EventGroupAssignment[];
+}
+
+export interface CompletionListResponse {
+  completions: CompletionRecord[];
+}
+
 export type SamlCallbackBody = {
   SAMLResponse?: string;
 };
@@ -334,5 +632,43 @@ export type UpdateSettingsBody = {[key: string]: string};
 export type GetAuditLogParams = {
 page?: number;
 limit?: number;
+};
+
+export type ListTrainingsParams = {
+page?: number;
+limit?: number;
+};
+
+export type UploadScormBody = {
+  file: Blob;
+};
+
+export type UploadPptxBody = {
+  file: Blob;
+};
+
+export type ScormCompleteBody = {
+  score?: number;
+};
+
+export type ListEventsParams = {
+page?: number;
+limit?: number;
+};
+
+export type AssignUserToEventBody = {
+  userId: string;
+};
+
+export type GenerateAttendanceCodeBody = {
+  expiresInMinutes?: number;
+};
+
+export type SubmitAttendanceCodeBody = {
+  code: string;
+};
+
+export type ManualMarkAttendanceBody = {
+  attended?: boolean;
 };
 
