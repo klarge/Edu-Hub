@@ -412,6 +412,10 @@ export interface CompletionRecord {
   createdAt: string;
   trainingTitle?: string | null;
   eventTitle?: string | null;
+  /** Earliest due date for this training across the user's assigned groups; null for event completions or trainings with no due date */
+  dueDate: string | null;
+  /** True if the training was completed after the due date */
+  isOverdue: boolean;
 }
 
 export interface CreateTrainingRequest {

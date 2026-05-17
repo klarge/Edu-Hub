@@ -164,7 +164,21 @@ router.get("/events/:id", authenticate, async (req: Request, res: Response) => {
   const { attendanceCode: _c, attendanceCodeExpiresAt: _e, ...safeEvent } = event;
   const responseEvent = isLead ? event : safeEvent;
 
-  res.json({ event: responseEvent, registrations, attendance });
+  // Only training_lead+ see the full roster and attendance list.
+  // Learners and managers only see their own record to protect other users' privacy.
+  const userId = req.user!.id;
+  const visibleRegistrations = isLead
+    ? registrations
+    : registrations.filter((r) => r.userId === userId);
+  const visibleAttendance = isLead
+    ? attendance
+    : attendance.filter((a) => a.userId === userId);
+
+  res.json({
+    event: responseEvent,
+    registrations: visibleRegistrations,
+    attendance: visibleAttendance,
+  });
 });
 
 // PUT /events/:id
@@ -475,15 +489,9 @@ router.post(
       method: "code",
     });
 
-    // Consume the code — single-use: null it out so no other user can reuse it
-    await db
-      .update(eventsTable)
-      .set({
-        attendanceCode: null,
-        attendanceCodeExpiresAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(eventsTable.id, id));
+    // The attendance code remains valid until its expiry window so that
+    // multiple registered attendees can all self-verify during the same session.
+    // No code nullification here — the code expires naturally at attendanceCodeExpiresAt.
 
     // Create completion record
     const completionExists = await db

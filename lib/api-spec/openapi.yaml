@@ -2567,7 +2567,7 @@ components:
 
     CompletionRecord:
       type: object
-      required: [id, userId, completedAt, createdAt]
+      required: [id, userId, completedAt, createdAt, dueDate, isOverdue]
       properties:
         id:
           type: string
@@ -2597,6 +2597,14 @@ components:
         eventTitle:
           type: string
           nullable: true
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+          description: Earliest due date for this training across the user's assigned groups; null for event completions or trainings with no due date
+        isOverdue:
+          type: boolean
+          description: True if the training was completed after the due date
 
     # ─── Request bodies ───────────────────────────────────────────────────────
 

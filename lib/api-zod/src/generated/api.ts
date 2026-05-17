@@ -1277,7 +1277,9 @@ export const GetUserCompletionsResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "createdAt": zod.coerce.date(),
   "trainingTitle": zod.string().nullish(),
-  "eventTitle": zod.string().nullish()
+  "eventTitle": zod.string().nullish(),
+  "dueDate": zod.coerce.date().nullable().describe('Earliest due date for this training across the user\'s assigned groups; null for event completions or trainings with no due date'),
+  "isOverdue": zod.boolean().describe('True if the training was completed after the due date')
 }))
 })
 
@@ -1296,7 +1298,9 @@ export const ListAllCompletionsResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "createdAt": zod.coerce.date(),
   "trainingTitle": zod.string().nullish(),
-  "eventTitle": zod.string().nullish()
+  "eventTitle": zod.string().nullish(),
+  "dueDate": zod.coerce.date().nullable().describe('Earliest due date for this training across the user\'s assigned groups; null for event completions or trainings with no due date'),
+  "isOverdue": zod.boolean().describe('True if the training was completed after the due date')
 }))
 })
 
