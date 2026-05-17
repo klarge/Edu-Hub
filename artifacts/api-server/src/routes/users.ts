@@ -428,7 +428,7 @@ router.get("/users/team/completion-status", authenticate, requireRole("manager")
 
   const assignedTrainingIds = [...new Set(allAssignments.map((a) => a.trainingId))];
 
-  const dueDateByTraining = new Map<string, string | null>();
+  const dueDateByTraining = new Map<string, Date | null>();
   for (const a of allAssignments) {
     const existing = dueDateByTraining.get(a.trainingId);
     if (a.dueDate) {

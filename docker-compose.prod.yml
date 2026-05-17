@@ -1,0 +1,11 @@
+# Production override — pulls pre-built images from GHCR instead of building locally.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  api:
+    build: !reset null
+    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/trainhub}/api-server:${IMAGE_TAG:-latest}
+
+  web:
+    build: !reset null
+    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/trainhub}/web:${IMAGE_TAG:-latest}

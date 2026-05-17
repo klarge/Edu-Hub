@@ -8,10 +8,13 @@ import {
   eventGroupAssignmentsTable,
   userTagGroupsTable,
   completionRecordsTable,
+  usersTable,
 } from "@workspace/db/schema";
 import { authenticate } from "../middlewares/auth.js";
 import { requireMinRole, requireRole } from "../middlewares/requireRole.js";
 import { canAccessEvent } from "../lib/trainingAccess.js";
+import { sendEventRegistrationConfirmation } from "../lib/mailer.js";
+import { logger } from "../lib/logger.js";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -312,6 +315,15 @@ router.post(
       .returning();
 
     res.status(201).json({ registration: reg });
+
+    // Fire-and-forget confirmation email
+    sendEventRegistrationConfirmation({
+      to: req.user!.email,
+      firstName: req.user!.firstName,
+      eventTitle: event.title,
+      location: event.location,
+      startAt: event.startAt,
+    }).catch((err) => logger.warn({ err }, "Failed to send event registration confirmation"));
   },
 );
 
@@ -331,7 +343,12 @@ router.post(
 
     // Validate event exists before attempting any writes (avoids FK-error 500)
     const [event] = await db
-      .select({ id: eventsTable.id })
+      .select({
+        id: eventsTable.id,
+        title: eventsTable.title,
+        location: eventsTable.location,
+        startAt: eventsTable.startAt,
+      })
       .from(eventsTable)
       .where(and(eq(eventsTable.id, id), eq(eventsTable.isActive, true)));
 
@@ -361,6 +378,27 @@ router.post(
       .returning();
 
     res.status(201).json({ registration: reg });
+
+    // Fire-and-forget confirmation email to the assigned user
+    (async () => {
+      try {
+        const [assignedUser] = await db
+          .select({ email: usersTable.email, firstName: usersTable.firstName })
+          .from(usersTable)
+          .where(eq(usersTable.id, userId));
+        if (assignedUser) {
+          await sendEventRegistrationConfirmation({
+            to: assignedUser.email,
+            firstName: assignedUser.firstName,
+            eventTitle: event.title,
+            location: event.location,
+            startAt: event.startAt,
+          });
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to send event assignment confirmation");
+      }
+    })();
   },
 );
 

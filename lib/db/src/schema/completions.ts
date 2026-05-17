@@ -1,6 +1,7 @@
 import {
   pgTable,
   uuid,
+  text,
   integer,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -21,6 +22,7 @@ export const completionRecordsTable = pgTable("completion_records", {
   }),
   durationMinutes: integer("duration_minutes"),
   score: integer("score"),
+  verificationCode: text("verification_code"),
   completedAt: timestamp("completed_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

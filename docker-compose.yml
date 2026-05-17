@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-trainhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trainhub_secret}
+      POSTGRES_DB:       ${POSTGRES_DB:-trainhub}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trainhub} -d ${POSTGRES_DB:-trainhub}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT:            8080
+      NODE_ENV:        production
+      DATABASE_URL:    postgresql://${POSTGRES_USER:-trainhub}:${POSTGRES_PASSWORD:-trainhub_secret}@postgres:5432/${POSTGRES_DB:-trainhub}
+      SESSION_SECRET:  ${SESSION_SECRET:?SESSION_SECRET must be set}
+      UPLOAD_DIR:      /data/uploads
+    volumes:
+      - uploads_data:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  uploads_data:

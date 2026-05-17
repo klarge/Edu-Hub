@@ -7,11 +7,14 @@ import {
   trainingGroupAssignmentsTable,
   userTagGroupsTable,
   contentViewsTable,
+  usersTable,
 } from "@workspace/db/schema";
 import { authenticate } from "../middlewares/auth.js";
 import { requireMinRole, requireRole } from "../middlewares/requireRole.js";
 import { canAccessTraining } from "../lib/trainingAccess.js";
 import { maybeCompleteTraining } from "../lib/completionHelper.js";
+import { sendTrainingAssigned } from "../lib/mailer.js";
+import { logger } from "../lib/logger.js";
 import type { Request, Response } from "express";
 import multer from "multer";
 import path from "path";
@@ -74,7 +77,7 @@ router.get("/trainings", authenticate, async (req: Request, res: Response) => {
   const offset = (pageNum - 1) * pageSize;
 
   let trainingIds: string[] | null = null;
-  const dueDateByTraining = new Map<string, string | null>();
+  const dueDateByTraining = new Map<string, Date | null>();
 
   if (req.user!.role === "user" || req.user!.role === "manager") {
     const userGroups = await db
@@ -626,6 +629,41 @@ router.post(
       .returning();
 
     res.status(201).json({ assignment });
+
+    // Fire-and-forget: notify group members
+    (async () => {
+      try {
+        const [training] = await db
+          .select({ title: trainingsTable.title })
+          .from(trainingsTable)
+          .where(eq(trainingsTable.id, id));
+
+        const members = await db
+          .select({
+            email: usersTable.email,
+            firstName: usersTable.firstName,
+          })
+          .from(userTagGroupsTable)
+          .innerJoin(usersTable, eq(userTagGroupsTable.userId, usersTable.id))
+          .where(
+            and(
+              eq(userTagGroupsTable.tagGroupId, groupId),
+              eq(usersTable.isActive, true),
+            ),
+          );
+
+        for (const member of members) {
+          await sendTrainingAssigned({
+            to: member.email,
+            firstName: member.firstName,
+            trainingTitle: training?.title ?? "a training",
+            dueDate: dueDate ? new Date(dueDate) : null,
+          });
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to send training-assigned emails");
+      }
+    })();
   },
 );
 
