@@ -594,6 +594,12 @@ export interface CompletionListResponse {
   completions: CompletionRecord[];
 }
 
+export interface ScormCompleteResponse {
+  success: boolean;
+  /** True if all completion criteria (content viewed + quiz passed) are now met */
+  trainingCompleted: boolean;
+}
+
 export type SamlCallbackBody = {
   SAMLResponse?: string;
 };
@@ -649,6 +655,8 @@ export type UploadPptxBody = {
 
 export type ScormCompleteBody = {
   score?: number;
+  /** Specific SCORM content item UUID to mark as viewed (marks all SCORM items if omitted) */
+  contentId?: string;
 };
 
 export type ListEventsParams = {

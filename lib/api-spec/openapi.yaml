@@ -1073,13 +1073,16 @@ paths:
               properties:
                 score:
                   type: integer
+                contentId:
+                  type: string
+                  description: Specific SCORM content item UUID to mark as viewed (marks all SCORM items if omitted)
       responses:
         "200":
           description: Completion recorded
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                $ref: "#/components/schemas/ScormCompleteResponse"
 
   /trainings/{id}/assignments:
     get:
@@ -2909,3 +2912,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CompletionRecord"
+
+    ScormCompleteResponse:
+      type: object
+      required: [success, trainingCompleted]
+      properties:
+        success:
+          type: boolean
+        trainingCompleted:
+          type: boolean
+          description: True if all completion criteria (content viewed + quiz passed) are now met

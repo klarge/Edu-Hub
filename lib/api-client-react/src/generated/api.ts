@@ -76,6 +76,7 @@ import type {
   RoleGroupListResponse,
   SamlCallbackBody,
   ScormCompleteBody,
+  ScormCompleteResponse,
   SettingsResponse,
   SubmitAttendanceCodeBody,
   SuccessResponse,
@@ -3500,9 +3501,9 @@ export const getScormCompleteUrl = (id: string,) => {
  * @summary Record SCORM completion event
  */
 export const scormComplete = async (id: string,
-    scormCompleteBody?: ScormCompleteBody, options?: RequestInit): Promise<SuccessResponse> => {
+    scormCompleteBody?: ScormCompleteBody, options?: RequestInit): Promise<ScormCompleteResponse> => {
 
-  return customFetch<SuccessResponse>(getScormCompleteUrl(id),
+  return customFetch<ScormCompleteResponse>(getScormCompleteUrl(id),
   {
     ...options,
     method: 'POST',

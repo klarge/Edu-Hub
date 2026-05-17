@@ -473,6 +473,16 @@ router.post(
       method: "code",
     });
 
+    // Consume the code — single-use: null it out so no other user can reuse it
+    await db
+      .update(eventsTable)
+      .set({
+        attendanceCode: null,
+        attendanceCodeExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventsTable.id, id));
+
     // Create completion record
     const completionExists = await db
       .select()

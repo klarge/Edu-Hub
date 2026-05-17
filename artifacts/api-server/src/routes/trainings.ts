@@ -16,10 +16,7 @@ import type { Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { execFile } from "child_process";
-import { promisify } from "util";
-
-const execFileAsync = promisify(execFile);
+import unzipper from "unzipper";
 
 const UPLOAD_DIR = process.env["UPLOAD_DIR"] ?? "/tmp/training-uploads";
 
@@ -295,14 +292,54 @@ router.post(
     ensureDir(scormDir);
 
     try {
-      // Use execFile (not exec/execSync) so arguments are passed as an array
-      // with no shell interpolation — no injection possible.
-      await execFileAsync("unzip", ["-o", req.file.path, "-d", scormDir]);
+      // ── Zip Slip prevention ──────────────────────────────────────────────
+      // Two-pass approach using unzipper (pure Node.js — no shell dependency):
+      //   Pass 1: open the archive and validate every entry path before writing
+      //           any bytes to disk.
+      //   Pass 2: stream-extract only after all paths have been validated.
+      const validateArchive = (): Promise<void> =>
+        new Promise((resolve, reject) => {
+          fs.createReadStream(req.file!.path)
+            .pipe(unzipper.Parse({ forceStream: true }))
+            .on("entry", (entry: unzipper.Entry) => {
+              const entryPath: string = entry.path;
+              const normalized = path.normalize(entryPath);
+              const resolved = path.resolve(scormDir, normalized);
+              if (
+                normalized.startsWith("..") ||
+                path.isAbsolute(normalized) ||
+                !resolved.startsWith(scormDir + path.sep) && resolved !== scormDir
+              ) {
+                entry.autodrain();
+                reject(new Error(`Unsafe path in archive: ${entryPath}`));
+              } else {
+                entry.autodrain();
+              }
+            })
+            .on("finish", resolve)
+            .on("error", reject);
+        });
+
+      const extractArchive = (): Promise<void> =>
+        new Promise((resolve, reject) => {
+          fs.createReadStream(req.file!.path)
+            .pipe(unzipper.Extract({ path: scormDir }))
+            .on("close", resolve)
+            .on("error", reject);
+        });
+
+      await validateArchive();
+      await extractArchive();
       fs.unlinkSync(req.file.path);
-    } catch {
+    } catch (err: unknown) {
+      if (res.headersSent) return;
       fs.rmSync(scormDir, { recursive: true, force: true });
       try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
-      res.status(400).json({ error: "Failed to extract SCORM package" });
+      const msg =
+        err instanceof Error && err.message.startsWith("Unsafe path")
+          ? "SCORM package contains unsafe file paths"
+          : "Failed to extract SCORM package";
+      res.status(400).json({ error: msg });
       return;
     }
 

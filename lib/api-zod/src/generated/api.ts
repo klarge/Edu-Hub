@@ -726,11 +726,13 @@ export const ScormCompleteParams = zod.object({
 })
 
 export const ScormCompleteBody = zod.object({
-  "score": zod.number().optional()
+  "score": zod.number().optional(),
+  "contentId": zod.string().optional().describe('Specific SCORM content item UUID to mark as viewed (marks all SCORM items if omitted)')
 })
 
 export const ScormCompleteResponse = zod.object({
-  "success": zod.boolean()
+  "success": zod.boolean(),
+  "trainingCompleted": zod.boolean().describe('True if all completion criteria (content viewed + quiz passed) are now met')
 })
 
 

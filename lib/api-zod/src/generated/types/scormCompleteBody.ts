@@ -8,4 +8,6 @@
 
 export type ScormCompleteBody = {
   score?: number;
+  /** Specific SCORM content item UUID to mark as viewed (marks all SCORM items if omitted) */
+  contentId?: string;
 };
