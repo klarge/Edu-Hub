@@ -14,6 +14,19 @@ services:
       timeout: 5s
       retries: 10
 
+  # Optional: Redis for session storage. Remove this service (and REDIS_URL from api)
+  # if you prefer the default in-memory session store (not suitable for multi-instance).
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -25,10 +38,14 @@ services:
       DATABASE_URL:    postgresql://${POSTGRES_USER:-trainhub}:${POSTGRES_PASSWORD:-trainhub_secret}@postgres:5432/${POSTGRES_DB:-trainhub}
       SESSION_SECRET:  ${SESSION_SECRET:?SESSION_SECRET must be set}
       UPLOAD_DIR:      /data/uploads
+      # Optional: set REDIS_URL to use Redis-backed sessions (required for multi-instance)
+      REDIS_URL:       ${REDIS_URL:-redis://redis:6379}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
@@ -44,3 +61,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  redis_data:

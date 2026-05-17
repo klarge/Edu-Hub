@@ -179,6 +179,18 @@ router.get(
     const settings: Record<string, string> = {};
     for (const row of settingsRows) settings[row.key] = row.value;
     const appName = settings["app_name"] || "TrainHub";
+    const appLogoUrl = settings["app_logo_url"] ?? "";
+
+    // Optionally fetch logo as buffer (graceful fallback on failure)
+    let logoBuffer: Buffer | null = null;
+    if (appLogoUrl) {
+      try {
+        const resp = await fetch(appLogoUrl, { signal: AbortSignal.timeout(5000) });
+        if (resp.ok) logoBuffer = Buffer.from(await resp.arrayBuffer());
+      } catch {
+        // silently skip logo if unreachable
+      }
+    }
 
     // Generate PDF
     const PDFDocument = (await import("pdfkit")).default;
@@ -207,22 +219,29 @@ router.get(
       .strokeColor("#4a90d9")
       .stroke();
 
+    // Logo (centered at top, max 48×48 — silently skipped if no URL or fetch failed)
+    const yOffset = logoBuffer ? 56 : 0;
+    if (logoBuffer) {
+      const logoSize = 48;
+      doc.image(logoBuffer, W / 2 - logoSize / 2, M + 8, { fit: [logoSize, logoSize] });
+    }
+
     // Platform name header
     doc
       .font("Helvetica-Bold")
       .fontSize(13)
       .fillColor("#4a90d9")
-      .text(appName.toUpperCase(), M, M + 14, { align: "center", width: W - 2 * M });
+      .text(appName.toUpperCase(), M, M + 14 + yOffset, { align: "center", width: W - 2 * M });
 
     // "Certificate of Completion" title
     doc
       .font("Helvetica-Bold")
       .fontSize(32)
       .fillColor("#1e3a5f")
-      .text("Certificate of Completion", M, M + 55, { align: "center", width: W - 2 * M });
+      .text("Certificate of Completion", M, M + 55 + yOffset, { align: "center", width: W - 2 * M });
 
     // Thin divider
-    const divY = M + 105;
+    const divY = M + 105 + yOffset;
     doc.moveTo(M + 40, divY).lineTo(W - M - 40, divY).lineWidth(1).strokeColor("#4a90d9").stroke();
 
     // "This certifies that"

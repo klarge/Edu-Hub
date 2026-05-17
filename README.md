@@ -49,17 +49,19 @@ The web frontend proxies all `/api/*` requests to the API server automatically.
 
 ### 4. First-run admin setup
 
-On the first start, the database is empty. Create the initial admin account by running the seed script:
+On the first start, the database is empty. To create the initial admin account:
+
+1. Open `http://localhost` and register a new account (any email and password).
+2. Promote that account to admin by running a one-time SQL command:
 
 ```bash
-docker compose exec api node ./dist/index.mjs --seed-admin \
-  --email admin@example.com \
-  --password ChangeMe123!
+docker compose exec postgres psql \
+  -U ${POSTGRES_USER:-trainhub} \
+  -d ${POSTGRES_DB:-trainhub} \
+  -c "UPDATE users SET role = 'admin' WHERE email = 'you@example.com';"
 ```
 
-> Or simply log in with the default credentials `admin@example.com` / `ChangeMe123!` if the database was seeded automatically during deployment.
-
-Then open `http://localhost` in your browser.
+Replace `you@example.com` with the email you registered with. You only need to do this once — all subsequent admin accounts can be promoted from **Admin → Users** in the web UI.
 
 ---
 
