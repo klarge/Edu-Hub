@@ -36,15 +36,8 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 
   const token = signToken(user);
   res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
-  res.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-    },
-  });
+  const { passwordHash: _ph, ...safeUser } = user;
+  res.json({ user: safeUser });
 });
 
 // POST /auth/logout
@@ -162,7 +155,7 @@ router.post("/auth/saml/callback", async (req: Request, res: Response) => {
       issuer: spEntityId,
       entryPoint,
       callbackUrl: acsUrl,
-      validateInResponseTo: ValidateInResponseTo.never,
+      validateInResponseTo: ValidateInResponseTo.ifPresent,
       wantAssertionsSigned: true,
     });
 

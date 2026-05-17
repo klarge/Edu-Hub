@@ -357,6 +357,8 @@ router.post("/users/:id/api-keys", authenticate, async (req: Request, res: Respo
     .returning({
       id: apiKeysTable.id,
       name: apiKeysTable.name,
+      isActive: apiKeysTable.isActive,
+      lastUsedAt: apiKeysTable.lastUsedAt,
       createdAt: apiKeysTable.createdAt,
     });
 

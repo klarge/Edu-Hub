@@ -137,13 +137,6 @@ router.put("/settings", authenticate, requireRole("admin"), async (req: Request,
 // GET /settings/public — publicly readable settings (app name, logo, etc.)
 router.get("/settings/public", async (_req: Request, res: Response) => {
   const publicKeys = ["app_name", "app_logo_url", "saml_enabled", "google_enabled", "microsoft_enabled"];
-  const rows = await db
-    .select()
-    .from(appSettingsTable)
-    .where(
-      eq(appSettingsTable.key, publicKeys[0]!),
-    );
-  // Fetch all public settings
   const allRows = await db.select().from(appSettingsTable);
   const settings: Record<string, string> = {};
   for (const row of allRows) {
