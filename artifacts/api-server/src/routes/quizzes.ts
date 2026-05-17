@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   quizzesTable,
@@ -40,7 +40,8 @@ router.get("/trainings/:id/quiz", authenticate, async (req: Request, res: Respon
   const questions = await db
     .select()
     .from(quizQuestionsTable)
-    .where(eq(quizQuestionsTable.quizId, quiz.id));
+    .where(eq(quizQuestionsTable.quizId, quiz.id))
+    .orderBy(asc(quizQuestionsTable.displayOrder), asc(quizQuestionsTable.id));
 
   // Strip correct answers for non-leads/admins
   const isLead = req.user!.role === "training_lead" || req.user!.role === "admin";
@@ -293,7 +294,8 @@ router.post(
     const questions = await db
       .select()
       .from(quizQuestionsTable)
-      .where(eq(quizQuestionsTable.quizId, quiz.id));
+      .where(eq(quizQuestionsTable.quizId, quiz.id))
+      .orderBy(asc(quizQuestionsTable.displayOrder), asc(quizQuestionsTable.id));
 
     if (answers.length !== questions.length) {
       res.status(400).json({

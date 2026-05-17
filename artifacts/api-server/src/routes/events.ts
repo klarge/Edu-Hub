@@ -329,6 +329,17 @@ router.post(
       return;
     }
 
+    // Validate event exists before attempting any writes (avoids FK-error 500)
+    const [event] = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, id), eq(eventsTable.isActive, true)));
+
+    if (!event) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
     const [existing] = await db
       .select()
       .from(eventRegistrationsTable)
