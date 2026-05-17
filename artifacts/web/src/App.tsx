@@ -1,8 +1,8 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/auth-context";
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
@@ -24,8 +24,19 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, staleTime: 30000 } },
 });
 
+type Role = "admin" | "training_lead" | "manager" | "user";
+
 function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
   return <AppLayout>{children}</AppLayout>;
+}
+
+function RequireRole({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user || !roles.includes(user.role as Role)) {
+    return <Redirect to="/dashboard" />;
+  }
+  return <>{children}</>;
 }
 
 function Router() {
@@ -52,31 +63,67 @@ function Router() {
         <AuthenticatedRoute><HistoryPage /></AuthenticatedRoute>
       </Route>
       <Route path="/manage/trainings">
-        <AuthenticatedRoute><ManageTrainingsPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin", "training_lead"]}>
+            <ManageTrainingsPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/manage/events">
-        <AuthenticatedRoute><ManageEventsPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin", "training_lead"]}>
+            <ManageEventsPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/team">
-        <AuthenticatedRoute><TeamStatusPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin", "manager"]}>
+            <TeamStatusPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/admin/users">
-        <AuthenticatedRoute><AdminUsersPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin"]}>
+            <AdminUsersPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/admin/groups">
-        <AuthenticatedRoute><AdminGroupsPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin"]}>
+            <AdminGroupsPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/admin/assignments">
-        <AuthenticatedRoute><AdminAssignmentsPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin"]}>
+            <AdminAssignmentsPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/admin/sso">
-        <AuthenticatedRoute><AdminSSOPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin"]}>
+            <AdminSSOPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/admin/smtp">
-        <AuthenticatedRoute><AdminSMTPPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin"]}>
+            <AdminSMTPPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route path="/admin/api-keys">
-        <AuthenticatedRoute><AdminApiKeysPage /></AuthenticatedRoute>
+        <AuthenticatedRoute>
+          <RequireRole roles={["admin"]}>
+            <AdminApiKeysPage />
+          </RequireRole>
+        </AuthenticatedRoute>
       </Route>
       <Route component={NotFound} />
     </Switch>
