@@ -46,8 +46,13 @@ export default function DashboardPage() {
   const trainings = (trainingsData?.trainings ?? []).filter((t) => t.isActive);
   const events = (eventsData?.events ?? []).filter((e) => e.isActive);
 
-  function getTrainingStatus(id: string): StatusGroup {
+  function getTrainingStatus(id: string, dueDate?: string | null): StatusGroup {
     if (completionMap.has(id)) return "completed";
+    if (dueDate) {
+      const due = new Date(dueDate);
+      if (isPast(due)) return "overdue";
+      if (due <= addDays(new Date(), 7)) return "upcoming";
+    }
     return "not_started";
   }
 
@@ -62,9 +67,13 @@ export default function DashboardPage() {
   const isLoading = trainingsLoading || eventsLoading || completionsLoading;
 
   const totalCompleted = completionsData?.completions.length ?? 0;
+  const overdueTrainings = trainings.filter(
+    (t) => getTrainingStatus(t.id, t.dueDate) === "overdue"
+  ).length;
   const overdueEvents = events.filter(
     (e) => getEventStatus(e.id, e.startAt) === "overdue"
   ).length;
+  const totalOverdue = overdueTrainings + overdueEvents;
 
   return (
     <div className="space-y-6">
@@ -82,7 +91,7 @@ export default function DashboardPage() {
         {[
           { label: "Assigned Trainings", value: trainings.length, icon: <BookOpen className="h-4 w-4 text-primary" /> },
           { label: "Completed", value: totalCompleted, icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" /> },
-          { label: "Overdue Events", value: overdueEvents, icon: <AlertTriangle className="h-4 w-4 text-destructive" /> },
+          { label: "Overdue", value: totalOverdue, icon: <AlertTriangle className="h-4 w-4 text-destructive" /> },
         ].map((stat) => (
           <div key={stat.label} className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">{stat.icon}<span className="text-xs text-muted-foreground">{stat.label}</span></div>
@@ -103,13 +112,19 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground py-6 text-center">No trainings available</p>
         ) : (
           <div className="space-y-4">
-            {(["not_started", "completed"] as StatusGroup[]).map((bucket) => {
-              const items = trainings.filter((t) => getTrainingStatus(t.id) === bucket);
+            {(["overdue", "upcoming", "not_started", "completed"] as StatusGroup[]).map((bucket) => {
+              const items = trainings.filter((t) => getTrainingStatus(t.id, t.dueDate) === bucket);
               if (items.length === 0) return null;
+              const bucketLabel: Record<StatusGroup, string> = {
+                overdue: "Overdue",
+                upcoming: "Due Soon",
+                not_started: "Not Started",
+                completed: "Completed",
+              };
               return (
                 <div key={bucket}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                    {bucket === "not_started" ? "Not Started" : "Completed"} ({items.length})
+                    {bucketLabel[bucket]} ({items.length})
                   </p>
                   <div className="space-y-1.5">
                     {items.map((t) => (
@@ -120,14 +135,21 @@ export default function DashboardPage() {
                         >
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
-                            {t.estimatedDurationMinutes && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <Clock className="h-3 w-3" />
-                                {t.estimatedDurationMinutes} min
-                              </p>
-                            )}
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              {t.estimatedDurationMinutes && (
+                                <>
+                                  <Clock className="h-3 w-3" />
+                                  {t.estimatedDurationMinutes} min
+                                </>
+                              )}
+                              {t.dueDate && (
+                                <span className={t.estimatedDurationMinutes ? "ml-2" : ""}>
+                                  Due {format(new Date(t.dueDate), "MMM d, yyyy")}
+                                </span>
+                              )}
+                            </p>
                           </div>
-                          <StatusBadge status={getTrainingStatus(t.id)} />
+                          <StatusBadge status={getTrainingStatus(t.id, t.dueDate)} />
                         </a>
                       </Link>
                     ))}

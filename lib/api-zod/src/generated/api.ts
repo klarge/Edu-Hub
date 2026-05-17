@@ -576,6 +576,7 @@ export const ListTrainingsResponse = zod.object({
   "estimatedDurationMinutes": zod.number().nullish(),
   "isActive": zod.boolean(),
   "createdBy": zod.string().nullish(),
+  "dueDate": zod.coerce.date().nullish().describe('Earliest due date from the current user\'s group assignments (null if no due date set)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })),
@@ -610,6 +611,7 @@ export const GetTrainingResponse = zod.object({
   "estimatedDurationMinutes": zod.number().nullish(),
   "isActive": zod.boolean(),
   "createdBy": zod.string().nullish(),
+  "dueDate": zod.coerce.date().nullish().describe('Earliest due date from the current user\'s group assignments (null if no due date set)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),
@@ -648,6 +650,7 @@ export const UpdateTrainingResponse = zod.object({
   "estimatedDurationMinutes": zod.number().nullish(),
   "isActive": zod.boolean(),
   "createdBy": zod.string().nullish(),
+  "dueDate": zod.coerce.date().nullish().describe('Earliest due date from the current user\'s group assignments (null if no due date set)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

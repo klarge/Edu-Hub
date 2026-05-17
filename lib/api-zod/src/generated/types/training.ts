@@ -13,6 +13,8 @@ export interface Training {
   estimatedDurationMinutes?: number | null;
   isActive: boolean;
   createdBy?: string | null;
+  /** Earliest due date from the current user's group assignments (null if no due date set) */
+  dueDate?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

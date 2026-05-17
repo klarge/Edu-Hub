@@ -1,11 +1,14 @@
 import { useState } from "react";
 import {
   useGetTeamCompletionStatus,
+  useListTrainings,
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { BarChart2, CheckCircle2, Clock, AlertTriangle, Search } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { BarChart2, CheckCircle2, Clock, AlertTriangle, Search, X } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -38,14 +41,43 @@ function parseSummary(raw: unknown): CompletionSummary {
 
 export default function TeamStatusPage() {
   const { data, isLoading } = useGetTeamCompletionStatus();
-  const [search, setSearch] = useState("");
+  const { data: trainingsData } = useListTrainings({ limit: 200 });
 
+  const [search, setSearch] = useState("");
+  const [trainingFilter, setTrainingFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const trainings = trainingsData?.trainings ?? [];
   const allUsers = data?.users ?? [];
-  const users = allUsers.filter(
-    (u) =>
-      !search ||
-      `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase())
-  );
+
+  const users = allUsers.filter((u) => {
+    if (
+      search &&
+      !`${u.firstName} ${u.lastName} ${u.email}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    ) {
+      return false;
+    }
+    const summary = parseSummary(u.completionSummary);
+    if (trainingFilter) {
+      const completed = summary?.completed ?? 0;
+      if (completed === 0) return false;
+    }
+    if (fromDate || toDate) {
+      const completedCount = summary?.completed ?? 0;
+      if (completedCount === 0) return false;
+    }
+    return true;
+  });
+
+  const hasFilters = !!trainingFilter || !!fromDate || !!toDate;
+  function clearFilters() {
+    setTrainingFilter("");
+    setFromDate("");
+    setToDate("");
+  }
 
   const totalMembers = allUsers.length;
   const totalCompleted = allUsers.reduce((sum, u) => {
@@ -101,15 +133,69 @@ export default function TeamStatusPage() {
         </div>
       )}
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search members..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-8"
-          data-testid="input-search-team"
-        />
+      {/* Filters */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search members..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+            data-testid="input-search-team"
+          />
+        </div>
+
+        <div>
+          <select
+            value={trainingFilter}
+            onChange={(e) => setTrainingFilter(e.target.value)}
+            data-testid="select-filter-training"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="">All trainings</option>
+            {trainings.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-0.5">
+          <Label className="text-xs text-muted-foreground">From date</Label>
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            data-testid="input-filter-from-date"
+            className="h-9"
+          />
+        </div>
+
+        <div className="space-y-0.5">
+          <Label className="text-xs text-muted-foreground">To date</Label>
+          <div className="flex gap-1.5">
+            <Input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              data-testid="input-filter-to-date"
+              className="h-9"
+            />
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={clearFilters}
+                data-testid="button-clear-filters"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
@@ -120,10 +206,12 @@ export default function TeamStatusPage() {
         <div className="bg-muted rounded-lg p-12 text-center">
           <BarChart2 className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm font-medium">
-            {search ? "No members match your search" : "No team members found"}
+            {search || hasFilters ? "No members match your filters" : "No team members found"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Users in your managed groups will appear here
+            {hasFilters
+              ? "Try adjusting your filters"
+              : "Users in your managed groups will appear here"}
           </p>
         </div>
       ) : (

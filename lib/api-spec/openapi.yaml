@@ -2364,6 +2364,11 @@ components:
         createdBy:
           type: string
           nullable: true
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+          description: Earliest due date from the current user's group assignments (null if no due date set)
         createdAt:
           type: string
           format: date-time

@@ -315,7 +315,7 @@ function EventAssignmentsTab() {
             <p className="text-sm text-muted-foreground py-4">No group assignments for this event</p>
           ) : (
             <div className="space-y-1.5">
-              {(assignments as { id: string; eventId: string; groupId: string }[]).map((a) => (
+              {assignments.map((a) => (
                 <div
                   key={a.id}
                   data-testid={`row-event-assignment-${a.id}`}

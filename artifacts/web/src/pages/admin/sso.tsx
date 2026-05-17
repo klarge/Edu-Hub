@@ -43,8 +43,8 @@ const PROVIDER_FIELDS: Record<Provider, { key: string; label: string; type?: str
 
 const PROVIDER_TEST_PATHS: Record<Provider, string> = {
   saml: "/api/auth/saml/login",
-  google: "/api/auth/google",
-  microsoft: "/api/auth/microsoft",
+  google: "/api/auth/oauth/google/login",
+  microsoft: "/api/auth/oauth/microsoft/login",
 };
 
 function ProviderCard({ provider }: { provider: Provider }) {

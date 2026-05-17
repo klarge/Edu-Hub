@@ -74,6 +74,7 @@ router.get("/trainings", authenticate, async (req: Request, res: Response) => {
   const offset = (pageNum - 1) * pageSize;
 
   let trainingIds: string[] | null = null;
+  const dueDateByTraining = new Map<string, string | null>();
 
   if (req.user!.role === "user" || req.user!.role === "manager") {
     const userGroups = await db
@@ -88,9 +89,23 @@ router.get("/trainings", authenticate, async (req: Request, res: Response) => {
     }
 
     const assignments = await db
-      .select({ trainingId: trainingGroupAssignmentsTable.trainingId })
+      .select({
+        trainingId: trainingGroupAssignmentsTable.trainingId,
+        dueDate: trainingGroupAssignmentsTable.dueDate,
+      })
       .from(trainingGroupAssignmentsTable)
       .where(inArray(trainingGroupAssignmentsTable.groupId, groupIds));
+
+    for (const a of assignments) {
+      const existing = dueDateByTraining.get(a.trainingId);
+      if (a.dueDate) {
+        if (!existing || a.dueDate < existing) {
+          dueDateByTraining.set(a.trainingId, a.dueDate);
+        }
+      } else if (!dueDateByTraining.has(a.trainingId)) {
+        dueDateByTraining.set(a.trainingId, null);
+      }
+    }
 
     trainingIds = [...new Set(assignments.map((a) => a.trainingId))];
     if (trainingIds.length === 0) {
@@ -109,7 +124,10 @@ router.get("/trainings", authenticate, async (req: Request, res: Response) => {
   ]);
 
   res.json({
-    trainings,
+    trainings: trainings.map((t) => ({
+      ...t,
+      dueDate: dueDateByTraining.get(t.id) ?? null,
+    })),
     total: Number(countResult[0]?.count ?? 0),
     page: pageNum,
     limit: pageSize,

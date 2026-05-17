@@ -75,8 +75,7 @@ export default function AdminApiKeysPage() {
           invalidate();
           setShowCreate(false);
           form.reset();
-          const raw = data as unknown as { key?: string; apiKey?: { key?: string } };
-          const keyValue = raw.key ?? raw.apiKey?.key;
+          const keyValue = data.key?.rawKey;
           if (keyValue) {
             setNewKey(keyValue);
           } else {
