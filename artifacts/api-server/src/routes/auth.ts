@@ -108,7 +108,6 @@ router.get("/auth/saml/login", async (req: Request, res: Response) => {
   const spEntityId = config["spEntityId"] ?? `${req.protocol}://${req.hostname}/api/auth/saml/metadata`;
   const acsUrl = config["callbackUrl"] ?? `${req.protocol}://${req.hostname}/api/auth/saml/callback`;
 
-  // Build minimal SAML AuthnRequest redirect
   const id = `_${uuidv4().replace(/-/g, "")}`;
   const issueInstant = new Date().toISOString();
   const authnRequest = `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="${id}" Version="2.0" IssueInstant="${issueInstant}" Destination="${entryPoint}" AssertionConsumerServiceURL="${acsUrl}" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"><saml:Issuer>${spEntityId}</saml:Issuer></samlp:AuthnRequest>`;
@@ -131,9 +130,18 @@ router.post("/auth/saml/callback", async (req: Request, res: Response) => {
     return;
   }
 
-  // NOTE: Full SAML assertion validation requires @node-saml/passport-saml or similar.
-  // This endpoint receives the SAMLResponse and should be configured with the IdP in production.
-  // For now we return a 501 indicating it needs the full SAML cert/key config.
+  const config = provider.config as Record<string, string>;
+  const idpCert = config["cert"];
+  const entryPoint = config["entryPoint"];
+
+  // Fail closed — require cert before processing ANY SAML response
+  if (!idpCert || !entryPoint) {
+    res.status(500).json({
+      error: "SAML IdP certificate and entryPoint must be configured before authentication can proceed",
+    });
+    return;
+  }
+
   const samlResponse = (req.body as Record<string, string>)["SAMLResponse"];
   if (!samlResponse) {
     res.status(400).json({ error: "Missing SAMLResponse" });
@@ -141,37 +149,72 @@ router.post("/auth/saml/callback", async (req: Request, res: Response) => {
   }
 
   try {
-    // Basic decode of SAML response to extract attributes
-    const decoded = Buffer.from(samlResponse, "base64").toString("utf-8");
-    const emailMatch = decoded.match(/<(?:saml:)?NameID[^>]*>([^<]+)<\/(?:saml:)?NameID>/);
-    const firstNameMatch = decoded.match(/FirstName[^>]*>([^<]+)</);
-    const lastNameMatch = decoded.match(/LastName[^>]*>([^<]+)</);
+    // Dynamically import SAML library to avoid esbuild issues with optional deps
+    const { SAML, ValidateInResponseTo } = await import("@node-saml/node-saml");
 
-    const email = emailMatch?.[1]?.trim();
-    if (!email) {
-      res.status(400).json({ error: "Could not extract email from SAML assertion" });
+    const spEntityId =
+      config["spEntityId"] ?? `${req.protocol}://${req.hostname}/api/auth/saml/metadata`;
+    const acsUrl =
+      config["callbackUrl"] ?? `${req.protocol}://${req.hostname}/api/auth/saml/callback`;
+
+    const saml = new SAML({
+      idpCert,
+      issuer: spEntityId,
+      entryPoint,
+      callbackUrl: acsUrl,
+      validateInResponseTo: ValidateInResponseTo.never,
+      wantAssertionsSigned: true,
+    });
+
+    const { profile } = await saml.validatePostResponseAsync({
+      SAMLResponse: samlResponse,
+    });
+
+    if (!profile) {
+      res.status(400).json({ error: "SAML profile is empty" });
       return;
     }
 
-    // Find or create user
+    const email = (profile.email ?? profile.nameID ?? "")
+      .toString()
+      .toLowerCase()
+      .trim();
+
+    if (!email) {
+      res.status(400).json({ error: "SAML assertion did not include an email or NameID" });
+      return;
+    }
+
+    const firstName =
+      (profile["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"] as string) ??
+      (profile["firstName"] as string) ??
+      "Unknown";
+    const lastName =
+      (profile["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"] as string) ??
+      (profile["lastName"] as string) ??
+      "User";
+
     let [user] = await db
       .select()
       .from(usersTable)
-      .where(and(eq(usersTable.email, email.toLowerCase()), eq(usersTable.isActive, true)));
+      .where(eq(usersTable.email, email));
 
     if (!user) {
       const [created] = await db
         .insert(usersTable)
         .values({
-          email: email.toLowerCase(),
-          firstName: firstNameMatch?.[1]?.trim() ?? "Unknown",
-          lastName: lastNameMatch?.[1]?.trim() ?? "User",
+          email,
+          firstName,
+          lastName,
           role: "user",
           ssoProvider: "saml",
-          ssoSubject: email,
+          ssoSubject: profile.nameID ?? email,
         })
         .returning();
       user = created!;
+    } else if (!user.isActive) {
+      res.status(403).json({ error: "Account is deactivated" });
+      return;
     }
 
     const token = signToken(user);
@@ -180,7 +223,8 @@ router.post("/auth/saml/callback", async (req: Request, res: Response) => {
     const frontendUrl = process.env["FRONTEND_URL"] ?? "/";
     res.redirect(frontendUrl);
   } catch (err) {
-    res.status(500).json({ error: "SAML processing failed" });
+    const message = err instanceof Error ? err.message : "SAML validation failed";
+    res.status(400).json({ error: `SAML processing failed: ${message}` });
   }
 });
 
@@ -188,7 +232,8 @@ router.post("/auth/saml/callback", async (req: Request, res: Response) => {
 
 type OAuthProvider = "google" | "microsoft";
 
-router.get("/auth/oauth/:provider", async (req: Request, res: Response) => {
+// GET /auth/oauth/:provider/login — initiate OAuth flow
+router.get("/auth/oauth/:provider/login", async (req: Request, res: Response) => {
   const provider = req.params["provider"] as OAuthProvider;
   if (!["google", "microsoft"].includes(provider)) {
     res.status(404).json({ error: "Unknown provider" });
@@ -250,6 +295,7 @@ router.get("/auth/oauth/:provider", async (req: Request, res: Response) => {
   res.redirect(authUrl);
 });
 
+// GET /auth/oauth/:provider/callback — handle OAuth callback
 router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response) => {
   const provider = req.params["provider"] as OAuthProvider;
   if (!["google", "microsoft"].includes(provider)) {
@@ -261,7 +307,7 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
   const cookieState = req.cookies?.[`oauth_state_${provider}`] as string | undefined;
 
   if (!cookieState || cookieState !== state) {
-    res.status(400).json({ error: "Invalid OAuth state" });
+    res.status(400).json({ error: "Invalid OAuth state — possible CSRF attempt" });
     return;
   }
 
@@ -280,12 +326,17 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
   const config = providerRow.config as Record<string, string>;
   const clientId = config["clientId"]!;
   const clientSecret = config["clientSecret"]!;
+
+  if (!clientId || !clientSecret) {
+    res.status(500).json({ error: "OAuth clientId and clientSecret must be configured" });
+    return;
+  }
+
   const callbackUrl =
     config["callbackUrl"] ??
     `${req.protocol}://${req.hostname}/api/auth/oauth/${provider}/callback`;
 
   try {
-    // Exchange code for tokens
     let tokenUrl: string;
     let userInfoUrl: string;
 
@@ -311,10 +362,11 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
     });
 
     const tokenData = (await tokenRes.json()) as Record<string, unknown>;
-    const accessToken = tokenData["access_token"] as string;
+    const accessToken = tokenData["access_token"] as string | undefined;
 
     if (!accessToken) {
-      res.status(400).json({ error: "Failed to get access token" });
+      const oauthError = (tokenData["error_description"] as string) ?? "Failed to get access token";
+      res.status(400).json({ error: oauthError });
       return;
     }
 
@@ -323,7 +375,6 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
     });
     const userInfo = (await userRes.json()) as Record<string, unknown>;
 
-    // Normalize user info across providers
     const email = (
       provider === "google"
         ? (userInfo["email"] as string)
@@ -332,13 +383,13 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
 
     const firstName =
       provider === "google"
-        ? (userInfo["given_name"] as string) ?? ""
-        : (userInfo["givenName"] as string) ?? "";
+        ? ((userInfo["given_name"] as string) ?? "")
+        : ((userInfo["givenName"] as string) ?? "");
 
     const lastName =
       provider === "google"
-        ? (userInfo["family_name"] as string) ?? ""
-        : (userInfo["surname"] as string) ?? "";
+        ? ((userInfo["family_name"] as string) ?? "")
+        : ((userInfo["surname"] as string) ?? "");
 
     const subject =
       provider === "google"
@@ -350,7 +401,6 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
       return;
     }
 
-    // Find or create user
     let [user] = await db
       .select()
       .from(usersTable)
@@ -380,7 +430,8 @@ router.get("/auth/oauth/:provider/callback", async (req: Request, res: Response)
     const frontendUrl = process.env["FRONTEND_URL"] ?? "/";
     res.redirect(frontendUrl);
   } catch (err) {
-    res.status(500).json({ error: "OAuth processing failed" });
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `OAuth processing failed: ${message}` });
   }
 });
 

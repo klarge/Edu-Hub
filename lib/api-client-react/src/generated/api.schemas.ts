@@ -256,6 +256,46 @@ export interface ApiKeyCreateResponse {
   key: ApiKeyCreateResponseKey;
 }
 
+export interface RoleGroup {
+  id: string;
+  name: string;
+  role: UserRole;
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface RoleGroupListResponse {
+  roleGroups: RoleGroup[];
+}
+
+export interface RoleGroupMember {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
+}
+
+export interface RoleGroupDetailResponse {
+  roleGroup: RoleGroup;
+  members: RoleGroupMember[];
+}
+
+export type TeamCompletionUserCompletionSummary = { [key: string]: unknown } | null;
+
+export interface TeamCompletionUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  completionSummary?: TeamCompletionUserCompletionSummary;
+}
+
+export interface TeamCompletionResponse {
+  users: TeamCompletionUser[];
+}
+
 export type SamlCallbackBody = {
   SAMLResponse?: string;
 };

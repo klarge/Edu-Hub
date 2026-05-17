@@ -392,6 +392,60 @@ export const RemoveGroupMemberResponse = zod.object({
 
 
 /**
+ * @summary Get completion status for manager's team members (manager only)
+ */
+export const GetTeamCompletionStatusResponse = zod.object({
+  "users": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "role": zod.enum(['admin', 'training_lead', 'manager', 'user']),
+  "completionSummary": zod.record(zod.string(), zod.unknown()).nullish()
+}))
+})
+
+
+/**
+ * @summary List the four fixed role groups (manager+)
+ */
+export const ListRoleGroupsResponse = zod.object({
+  "roleGroups": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['admin', 'training_lead', 'manager', 'user']),
+  "description": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Get a role group with its current members
+ */
+export const GetRoleGroupParams = zod.object({
+  "role": zod.enum(['admin', 'training_lead', 'manager', 'user'])
+})
+
+export const GetRoleGroupResponse = zod.object({
+  "roleGroup": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['admin', 'training_lead', 'manager', 'user']),
+  "description": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "isActive": zod.boolean()
+}))
+})
+
+
+/**
  * @summary Get all application settings (admin only)
  */
 export const GetSettingsResponse = zod.object({

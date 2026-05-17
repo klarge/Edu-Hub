@@ -18,11 +18,12 @@ import { parse } from "csv-parse/sync";
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Helper to strip passwordHash from user
 function safeUser(user: typeof usersTable.$inferSelect) {
   const { passwordHash: _ph, ...safe } = user;
   return safe;
 }
+
+// ─── Users ────────────────────────────────────────────────────────────────────
 
 // GET /users
 router.get("/users", authenticate, requireMinRole("manager"), async (req: Request, res: Response) => {
@@ -31,57 +32,78 @@ router.get("/users", authenticate, requireMinRole("manager"), async (req: Reques
   const pageSize = Math.min(100, Math.max(1, parseInt(limit)));
   const offset = (pageNum - 1) * pageSize;
 
-  // Managers can only see users in their tag groups
+  // ── Resolve base user ID set based on role ──────────────────────────────────
+
   let allowedUserIds: string[] | null = null;
   if (req.user?.role === "manager") {
     const managerGroups = await db
       .select({ tagGroupId: userTagGroupsTable.tagGroupId })
       .from(userTagGroupsTable)
       .where(eq(userTagGroupsTable.userId, req.user.id));
+
     const groupIds = managerGroups.map((g) => g.tagGroupId);
+
     if (groupIds.length === 0) {
+      // Manager with no tag groups sees no users
       res.json({ users: [], total: 0, page: pageNum, limit: pageSize });
       return;
     }
+
     const usersInGroups = await db
       .select({ userId: userTagGroupsTable.userId })
       .from(userTagGroupsTable)
       .where(inArray(userTagGroupsTable.tagGroupId, groupIds));
+
     allowedUserIds = [...new Set(usersInGroups.map((u) => u.userId))];
   }
 
-  const conditions: ReturnType<typeof eq>[] = [];
-  if (role) conditions.push(eq(usersTable.role, role as "admin" | "training_lead" | "manager" | "user"));
-  if (allowedUserIds) conditions.push(inArray(usersTable.id, allowedUserIds));
+  // ── Resolve groupId filter ────────────────────────────────────────────────
 
-  let query = db.select().from(usersTable);
-
-  if (search) {
-    const term = `%${search}%`;
-    const combined = conditions.length > 0
-      ? and(...conditions, or(like(usersTable.email, term), like(usersTable.firstName, term), like(usersTable.lastName, term)))
-      : or(like(usersTable.email, term), like(usersTable.firstName, term), like(usersTable.lastName, term));
-    query = query.where(combined) as typeof query;
-  } else if (conditions.length > 0) {
-    query = query.where(and(...conditions)) as typeof query;
-  }
-
+  let groupFilterIds: string[] | null = null;
   if (groupId) {
     const usersInGroup = await db
       .select({ userId: userTagGroupsTable.userId })
       .from(userTagGroupsTable)
       .where(eq(userTagGroupsTable.tagGroupId, groupId));
-    const ids = usersInGroup.map((u) => u.userId);
-    if (ids.length === 0) {
+
+    if (usersInGroup.length === 0) {
       res.json({ users: [], total: 0, page: pageNum, limit: pageSize });
       return;
     }
-    query = query.where(inArray(usersTable.id, ids)) as typeof query;
+    groupFilterIds = usersInGroup.map((u) => u.userId);
   }
 
+  // ── Build WHERE conditions ────────────────────────────────────────────────
+
+  type Condition = Parameters<typeof and>[0];
+  const conditions: Condition[] = [];
+
+  if (role) conditions.push(eq(usersTable.role, role as "admin" | "training_lead" | "manager" | "user"));
+  if (allowedUserIds) conditions.push(inArray(usersTable.id, allowedUserIds));
+  if (groupFilterIds) conditions.push(inArray(usersTable.id, groupFilterIds));
+
+  if (search) {
+    const term = `%${search}%`;
+    conditions.push(
+      or(
+        like(usersTable.email, term),
+        like(usersTable.firstName, term),
+        like(usersTable.lastName, term),
+      )!,
+    );
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // ── Execute count + data with same WHERE clause ───────────────────────────
+
   const [countResult, users] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(usersTable),
-    query.offset(offset).limit(pageSize),
+    whereClause
+      ? db.select({ count: sql<number>`count(*)` }).from(usersTable).where(whereClause)
+      : db.select({ count: sql<number>`count(*)` }).from(usersTable),
+    whereClause
+      ? db.select().from(usersTable).where(whereClause).offset(offset).limit(pageSize)
+      : db.select().from(usersTable).offset(offset).limit(pageSize),
   ]);
 
   res.json({
@@ -134,22 +156,29 @@ router.post("/users", authenticate, requireRole("admin"), async (req: Request, r
 router.get("/users/:id", authenticate, requireMinRole("manager"), async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
 
-  // Managers can only access users in their groups
+  // Managers may only access users who share at least one tag group with them
   if (req.user?.role === "manager") {
     const managerGroups = await db
       .select({ tagGroupId: userTagGroupsTable.tagGroupId })
       .from(userTagGroupsTable)
       .where(eq(userTagGroupsTable.userId, req.user.id));
+
     const groupIds = managerGroups.map((g) => g.tagGroupId);
-    if (groupIds.length > 0) {
-      const [membership] = await db
-        .select()
-        .from(userTagGroupsTable)
-        .where(and(eq(userTagGroupsTable.userId, id), inArray(userTagGroupsTable.tagGroupId, groupIds)));
-      if (!membership) {
-        res.status(403).json({ error: "Access denied" });
-        return;
-      }
+
+    // Manager with zero tag groups: deny access to all users
+    if (groupIds.length === 0) {
+      res.status(403).json({ error: "Access denied: no shared tag groups" });
+      return;
+    }
+
+    const [membership] = await db
+      .select()
+      .from(userTagGroupsTable)
+      .where(and(eq(userTagGroupsTable.userId, id), inArray(userTagGroupsTable.tagGroupId, groupIds)));
+
+    if (!membership) {
+      res.status(403).json({ error: "Access denied: user is not in your groups" });
+      return;
     }
   }
 
@@ -159,7 +188,6 @@ router.get("/users/:id", authenticate, requireMinRole("manager"), async (req: Re
     return;
   }
 
-  // Get tag groups
   const tagGroups = await db
     .select({ tagGroupId: userTagGroupsTable.tagGroupId })
     .from(userTagGroupsTable)
@@ -238,7 +266,6 @@ router.post(
     let records: Array<Record<string, string>> = [];
 
     if (req.file) {
-      // CSV upload
       const csv = req.file.buffer.toString("utf-8");
       records = parse(csv, { columns: true, trim: true, skip_empty_lines: true });
     } else if (req.body && Array.isArray((req.body as { users?: unknown }).users)) {
@@ -289,7 +316,6 @@ router.post(
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
 
-// GET /users/:id/api-keys
 router.get("/users/:id/api-keys", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
   if (req.user!.role !== "admin" && req.user!.id !== id) {
@@ -310,7 +336,6 @@ router.get("/users/:id/api-keys", authenticate, async (req: Request, res: Respon
   res.json({ keys });
 });
 
-// POST /users/:id/api-keys
 router.post("/users/:id/api-keys", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
   if (req.user!.role !== "admin" && req.user!.id !== id) {
@@ -335,11 +360,9 @@ router.post("/users/:id/api-keys", authenticate, async (req: Request, res: Respo
       createdAt: apiKeysTable.createdAt,
     });
 
-  // Return the raw key only once
   res.status(201).json({ key: { ...key, rawKey } });
 });
 
-// DELETE /users/:id/api-keys/:keyId
 router.delete("/users/:id/api-keys/:keyId", authenticate, async (req: Request, res: Response) => {
   const { id, keyId } = req.params as { id: string; keyId: string };
   if (req.user!.role !== "admin" && req.user!.id !== id) {
@@ -352,6 +375,47 @@ router.delete("/users/:id/api-keys/:keyId", authenticate, async (req: Request, r
     .where(and(eq(apiKeysTable.id, keyId), eq(apiKeysTable.userId, id)));
 
   res.json({ success: true });
+});
+
+// ─── Manager Team Completion Status ──────────────────────────────────────────
+
+router.get("/users/team/completion-status", authenticate, requireRole("manager"), async (req: Request, res: Response) => {
+  const managerGroups = await db
+    .select({ tagGroupId: userTagGroupsTable.tagGroupId })
+    .from(userTagGroupsTable)
+    .where(eq(userTagGroupsTable.userId, req.user!.id));
+
+  const groupIds = managerGroups.map((g) => g.tagGroupId);
+
+  if (groupIds.length === 0) {
+    res.json({ users: [] });
+    return;
+  }
+
+  const usersInGroups = await db
+    .select({ userId: userTagGroupsTable.userId })
+    .from(userTagGroupsTable)
+    .where(inArray(userTagGroupsTable.tagGroupId, groupIds));
+
+  const userIds = [...new Set(usersInGroups.map((u) => u.userId))];
+
+  const teamUsers = await db
+    .select()
+    .from(usersTable)
+    .where(and(inArray(usersTable.id, userIds), eq(usersTable.isActive, true)));
+
+  // Completion data will be added in Task #2 when the completions table exists.
+  // For now return user roster with empty completion summary.
+  res.json({
+    users: teamUsers.map((u) => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      role: u.role,
+      completionSummary: null,
+    })),
+  });
 });
 
 export default router;

@@ -1,7 +1,14 @@
 import jwt from "jsonwebtoken";
 import type { SafeUser } from "@workspace/db";
 
-const SECRET = process.env["SESSION_SECRET"] ?? "dev-secret-change-in-production";
+function getSecret(): string {
+  const secret = process.env["SESSION_SECRET"];
+  if (!secret) {
+    throw new Error("SESSION_SECRET environment variable is required for JWT signing");
+  }
+  return secret;
+}
+
 const EXPIRES_IN = "7d";
 
 export interface JwtPayload {
@@ -15,13 +22,13 @@ export interface JwtPayload {
 export function signToken(user: Pick<SafeUser, "id" | "email" | "role">): string {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role } satisfies Omit<JwtPayload, "iat" | "exp">,
-    SECRET,
+    getSecret(),
     { expiresIn: EXPIRES_IN },
   );
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, SECRET) as JwtPayload;
+  return jwt.verify(token, getSecret()) as JwtPayload;
 }
 
 export const COOKIE_NAME = "auth_token";

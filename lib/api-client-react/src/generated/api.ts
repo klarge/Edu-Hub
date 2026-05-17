@@ -45,15 +45,19 @@ import type {
   OAuthProvider,
   OauthCallbackParams,
   PaginatedUsers,
+  RoleGroupDetailResponse,
+  RoleGroupListResponse,
   SamlCallbackBody,
   SettingsResponse,
   SuccessResponse,
+  TeamCompletionResponse,
   UpdateAuthProviderRequest,
   UpdateGroupRequest,
   UpdateSettingsBody,
   UpdateUserRequest,
   UserDetailResponse,
-  UserResponse
+  UserResponse,
+  UserRole
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -597,7 +601,7 @@ export const getOauthLoginUrl = (provider: OAuthProvider,) => {
 
 
 
-  return `/api/auth/oauth/${provider}`
+  return `/api/auth/oauth/${provider}/login`
 }
 
 /**
@@ -620,7 +624,7 @@ export const oauthLogin = async (provider: OAuthProvider, options?: RequestInit)
 
 export const getOauthLoginQueryKey = (provider: OAuthProvider,) => {
     return [
-    `/api/auth/oauth/${provider}`
+    `/api/auth/oauth/${provider}/login`
     ] as const;
     }
 
@@ -2011,6 +2015,237 @@ export const useRemoveGroupMember = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getRemoveGroupMemberMutationOptions(options));
     }
+
+export const getGetTeamCompletionStatusUrl = () => {
+
+
+
+
+  return `/api/users/team/completion-status`
+}
+
+/**
+ * @summary Get completion status for manager's team members (manager only)
+ */
+export const getTeamCompletionStatus = async ( options?: RequestInit): Promise<TeamCompletionResponse> => {
+
+  return customFetch<TeamCompletionResponse>(getGetTeamCompletionStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTeamCompletionStatusQueryKey = () => {
+    return [
+    `/api/users/team/completion-status`
+    ] as const;
+    }
+
+
+export const getGetTeamCompletionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTeamCompletionStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeamCompletionStatus>>> = ({ signal }) => getTeamCompletionStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTeamCompletionStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTeamCompletionStatus>>>
+export type GetTeamCompletionStatusQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get completion status for manager's team members (manager only)
+ */
+
+export function useGetTeamCompletionStatus<TData = Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTeamCompletionStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListRoleGroupsUrl = () => {
+
+
+
+
+  return `/api/groups/roles`
+}
+
+/**
+ * @summary List the four fixed role groups (manager+)
+ */
+export const listRoleGroups = async ( options?: RequestInit): Promise<RoleGroupListResponse> => {
+
+  return customFetch<RoleGroupListResponse>(getListRoleGroupsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRoleGroupsQueryKey = () => {
+    return [
+    `/api/groups/roles`
+    ] as const;
+    }
+
+
+export const getListRoleGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listRoleGroups>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRoleGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRoleGroupsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRoleGroups>>> = ({ signal }) => listRoleGroups({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRoleGroups>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRoleGroupsQueryResult = NonNullable<Awaited<ReturnType<typeof listRoleGroups>>>
+export type ListRoleGroupsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the four fixed role groups (manager+)
+ */
+
+export function useListRoleGroups<TData = Awaited<ReturnType<typeof listRoleGroups>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRoleGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRoleGroupsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRoleGroupUrl = (role: UserRole,) => {
+
+
+
+
+  return `/api/groups/roles/${role}`
+}
+
+/**
+ * @summary Get a role group with its current members
+ */
+export const getRoleGroup = async (role: UserRole, options?: RequestInit): Promise<RoleGroupDetailResponse> => {
+
+  return customFetch<RoleGroupDetailResponse>(getGetRoleGroupUrl(role),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRoleGroupQueryKey = (role: UserRole,) => {
+    return [
+    `/api/groups/roles/${role}`
+    ] as const;
+    }
+
+
+export const getGetRoleGroupQueryOptions = <TData = Awaited<ReturnType<typeof getRoleGroup>>, TError = ErrorType<ErrorResponse>>(role: UserRole, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRoleGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRoleGroupQueryKey(role);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoleGroup>>> = ({ signal }) => getRoleGroup(role, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(role), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRoleGroup>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRoleGroupQueryResult = NonNullable<Awaited<ReturnType<typeof getRoleGroup>>>
+export type GetRoleGroupQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a role group with its current members
+ */
+
+export function useGetRoleGroup<TData = Awaited<ReturnType<typeof getRoleGroup>>, TError = ErrorType<ErrorResponse>>(
+ role: UserRole, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRoleGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRoleGroupQueryOptions(role,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetSettingsUrl = () => {
 

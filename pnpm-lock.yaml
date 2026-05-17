@@ -163,6 +163,9 @@ importers:
 
   artifacts/api-server:
     dependencies:
+      '@node-saml/node-saml':
+        specifier: ^5.1.0
+        version: 5.1.0
       '@node-saml/passport-saml':
         specifier: ^5.1.0
         version: 5.1.0
