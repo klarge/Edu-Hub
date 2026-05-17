@@ -1,22 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Training Platform API
 servers:
   - url: /api
     description: Base API path
+
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: groups
+    description: Tag group management
+  - name: settings
+    description: Application settings
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +32,736 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Auth ───────────────────────────────────────────────────────────────────
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Local username/password login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and clear auth cookie
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/saml/login:
+    get:
+      operationId: samlLogin
+      tags: [auth]
+      summary: Initiate SAML SSO login (redirects to IdP)
+      responses:
+        "302":
+          description: Redirect to IdP
+        "404":
+          description: SAML not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/saml/callback:
+    post:
+      operationId: samlCallback
+      tags: [auth]
+      summary: SAML SSO callback (IdP posts here)
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                SAMLResponse:
+                  type: string
+      responses:
+        "302":
+          description: Redirect to frontend after successful auth
+        "400":
+          description: Invalid SAML response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/saml/metadata:
+    get:
+      operationId: samlMetadata
+      tags: [auth]
+      summary: SAML SP metadata XML
+      responses:
+        "200":
+          description: SP metadata XML
+          content:
+            application/xml:
+              schema:
+                type: string
+
+  /auth/oauth/{provider}:
+    get:
+      operationId: oauthLogin
+      tags: [auth]
+      summary: Initiate OAuth login (redirects to provider)
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            $ref: "#/components/schemas/OAuthProvider"
+      responses:
+        "302":
+          description: Redirect to OAuth provider
+        "404":
+          description: Provider not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/oauth/{provider}/callback:
+    get:
+      operationId: oauthCallback
+      tags: [auth]
+      summary: OAuth callback handler
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            $ref: "#/components/schemas/OAuthProvider"
+        - in: query
+          name: code
+          schema:
+            type: string
+        - in: query
+          name: state
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to frontend after successful auth
+        "400":
+          description: OAuth error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── Users ──────────────────────────────────────────────────────────────────
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users (paginated, searchable)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: role
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - in: query
+          name: groupId
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedUsers"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user (admin only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/import:
+    post:
+      operationId: importUsers
+      tags: [users]
+      summary: Bulk import users via CSV file or JSON array (admin only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+          application/json:
+            schema:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ImportUserRecord"
+      responses:
+        "200":
+          description: Import results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetailResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deactivateUser
+      tags: [users]
+      summary: Deactivate user (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/api-keys:
+    get:
+      operationId: listApiKeys
+      tags: [users]
+      summary: List API keys for a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: List of API keys (without secrets)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyListResponse"
+
+    post:
+      operationId: createApiKey
+      tags: [users]
+      summary: Create an API key for a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "201":
+          description: API key created (rawKey shown once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreateResponse"
+
+  /users/{id}/api-keys/{keyId}:
+    delete:
+      operationId: revokeApiKey
+      tags: [users]
+      summary: Revoke an API key
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - in: path
+          name: keyId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─── Groups ─────────────────────────────────────────────────────────────────
+
+  /groups:
+    get:
+      operationId: listGroups
+      tags: [groups]
+      summary: List all tag groups
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupListResponse"
+
+    post:
+      operationId: createGroup
+      tags: [groups]
+      summary: Create a tag group (admin only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupRequest"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+
+  /groups/{id}:
+    get:
+      operationId: getGroup
+      tags: [groups]
+      summary: Get a tag group by ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateGroup
+      tags: [groups]
+      summary: Update a tag group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroupRequest"
+      responses:
+        "200":
+          description: Updated group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+
+    delete:
+      operationId: deleteGroup
+      tags: [groups]
+      summary: Delete a tag group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      responses:
+        "200":
+          description: Group deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /groups/{id}/members:
+    get:
+      operationId: listGroupMembers
+      tags: [groups]
+      summary: List members of a tag group
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      responses:
+        "200":
+          description: List of group members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupMemberListResponse"
+
+    post:
+      operationId: addGroupMember
+      tags: [groups]
+      summary: Add a user to a tag group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /groups/{id}/members/{userId}:
+    delete:
+      operationId: removeGroupMember
+      tags: [groups]
+      summary: Remove a user from a tag group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Member removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─── Settings ────────────────────────────────────────────────────────────────
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get all application settings (admin only)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Application settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsResponse"
+
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update application settings (admin only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /settings/public:
+    get:
+      operationId: getPublicSettings
+      tags: [settings]
+      summary: Get publicly readable settings (app name, enabled auth providers)
+      responses:
+        "200":
+          description: Public settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsResponse"
+
+  /settings/auth-providers:
+    get:
+      operationId: listAuthProviders
+      tags: [settings]
+      summary: List authentication provider configurations (admin only)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Auth provider configs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProviderListResponse"
+
+  /settings/auth-providers/{provider}:
+    get:
+      operationId: getAuthProvider
+      tags: [settings]
+      summary: Get an auth provider config (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AuthProvider"
+      responses:
+        "200":
+          description: Auth provider config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProviderResponse"
+
+    put:
+      operationId: updateAuthProvider
+      tags: [settings]
+      summary: Update auth provider config (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AuthProvider"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAuthProviderRequest"
+      responses:
+        "200":
+          description: Updated config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthProviderResponse"
+
+  /settings/audit-log:
+    get:
+      operationId: getAuditLog
+      tags: [settings]
+      summary: Get audit log entries (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponse"
+
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+
+  parameters:
+    UserId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: User UUID
+    GroupId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Group UUID
+    AuthProvider:
+      in: path
+      name: provider
+      required: true
+      schema:
+        $ref: "#/components/schemas/AuthProviderType"
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +771,419 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    UserRole:
+      type: string
+      enum: [admin, training_lead, manager, user]
+
+    TagGroupType:
+      type: string
+      enum: [location, job_type]
+
+    AuthProviderType:
+      type: string
+      enum: [saml, google, microsoft]
+
+    OAuthProvider:
+      type: string
+      enum: [google, microsoft]
+
+    User:
+      type: object
+      required: [id, email, firstName, lastName, role, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+        ssoProvider:
+          type: string
+          nullable: true
+        ssoSubject:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserDetail:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            tagGroupIds:
+              type: array
+              items:
+                type: string
+
+    TagGroup:
+      type: object
+      required: [id, name, type, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/TagGroupType"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GroupMember:
+      type: object
+      required: [userId, email, firstName, lastName, role, isActive]
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+
+    AuthProviderConfig:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          $ref: "#/components/schemas/AuthProviderType"
+        enabled:
+          type: boolean
+        config:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AuditLogEntry:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        userEmail:
+          type: string
+          nullable: true
+        userFirstName:
+          type: string
+          nullable: true
+        userLastName:
+          type: string
+          nullable: true
+
+    ApiKeyInfo:
+      type: object
+      required: [id, name, isActive, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ImportUserRecord:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        password:
+          type: string
+
+    ImportResultItem:
+      type: object
+      required: [email, status]
+      properties:
+        email:
+          type: string
+        status:
+          type: string
+          enum: [created, exists, error]
+        error:
+          type: string
+          nullable: true
+
+    # ─── Request bodies ──────────────────────────────────────────────────────
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    CreateUserRequest:
+      type: object
+      required: [email, firstName, lastName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+
+    CreateGroupRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/TagGroupType"
+
+    UpdateGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/TagGroupType"
+
+    UpdateAuthProviderRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        config:
+          type: object
+          additionalProperties: true
+
+    # ─── Response wrappers ──────────────────────────────────────────────────────
+
+    LoginResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    MeResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    UserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    UserDetailResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserDetail"
+
+    PaginatedUsers:
+      type: object
+      required: [users, total, page, limit]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ImportResult:
+      type: object
+      required: [total, created, existing, errors, results]
+      properties:
+        total:
+          type: integer
+        created:
+          type: integer
+        existing:
+          type: integer
+        errors:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportResultItem"
+
+    GroupResponse:
+      type: object
+      required: [group]
+      properties:
+        group:
+          $ref: "#/components/schemas/TagGroup"
+
+    GroupListResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagGroup"
+
+    GroupMemberListResponse:
+      type: object
+      required: [members]
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupMember"
+
+    SettingsResponse:
+      type: object
+      required: [settings]
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+
+    AuthProviderResponse:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          $ref: "#/components/schemas/AuthProviderConfig"
+
+    AuthProviderListResponse:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthProviderConfig"
+
+    AuditLogResponse:
+      type: object
+      required: [logs, page, limit]
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ApiKeyListResponse:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKeyInfo"
+
+    ApiKeyCreateResponse:
+      type: object
+      required: [key]
+      properties:
+        key:
+          allOf:
+            - $ref: "#/components/schemas/ApiKeyInfo"
+            - type: object
+              properties:
+                rawKey:
+                  type: string
