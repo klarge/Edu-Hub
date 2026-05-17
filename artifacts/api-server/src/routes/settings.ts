@@ -29,6 +29,11 @@ router.get("/settings/auth-providers", authenticate, requireRole("admin"), async
 // GET /settings/auth-providers/:provider
 router.get("/settings/auth-providers/:provider", authenticate, requireRole("admin"), async (req: Request, res: Response) => {
   const { provider } = req.params as { provider: string };
+  const validProviders = ["saml", "google", "microsoft"] as const;
+  if (!validProviders.includes(provider as "saml" | "google" | "microsoft")) {
+    res.status(400).json({ error: `Invalid provider. Must be one of: ${validProviders.join(", ")}` });
+    return;
+  }
   const [row] = await db
     .select()
     .from(authProvidersTable)
