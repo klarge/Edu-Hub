@@ -281,7 +281,21 @@ export interface RoleGroupDetailResponse {
   members: RoleGroupMember[];
 }
 
-export type TeamCompletionUserCompletionSummary = { [key: string]: unknown } | null;
+export interface UserGroupMembership {
+  groupId: string;
+  groupName: string;
+}
+
+export interface UserGroupMembershipsResponse {
+  groups: UserGroupMembership[];
+}
+
+export interface TeamCompletionSummary {
+  completed: number;
+  pending: number;
+  overdue: number;
+  total: number;
+}
 
 export interface TeamCompletionUser {
   id: string;
@@ -289,7 +303,7 @@ export interface TeamCompletionUser {
   firstName: string;
   lastName: string;
   role: UserRole;
-  completionSummary?: TeamCompletionUserCompletionSummary;
+  completionSummary?: TeamCompletionSummary | null;
 }
 
 export interface TeamCompletionResponse {
@@ -639,6 +653,21 @@ export type CreateApiKeyBody = {
 
 export type AddGroupMemberBody = {
   userId: string;
+};
+
+export type GetTeamCompletionStatusParams = {
+/**
+ * Filter completion data to a specific training
+ */
+trainingId?: string;
+/**
+ * Filter completions from this date (ISO date string)
+ */
+fromDate?: string;
+/**
+ * Filter completions up to this date (ISO date string)
+ */
+toDate?: string;
 };
 
 export type UpdateSettingsBody = {[key: string]: string};

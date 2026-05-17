@@ -607,6 +607,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /users/{id}/groups:
+    get:
+      operationId: getUserGroups
+      tags: [users]
+      summary: Get groups a user belongs to (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User group memberships
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserGroupMembershipsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /users/team/completion-status:
     get:
       operationId: getTeamCompletionStatus
@@ -614,6 +637,27 @@ paths:
       summary: Get completion status for manager's team members (manager only)
       security:
         - cookieAuth: []
+      parameters:
+        - in: query
+          name: trainingId
+          required: false
+          schema:
+            type: string
+          description: Filter completion data to a specific training
+        - in: query
+          name: fromDate
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Filter completions from this date (ISO date string)
+        - in: query
+          name: toDate
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Filter completions up to this date (ISO date string)
       responses:
         "200":
           description: Team users with completion summary
@@ -2311,6 +2355,37 @@ components:
           items:
             $ref: "#/components/schemas/RoleGroupMember"
 
+    UserGroupMembership:
+      type: object
+      required: [groupId, groupName]
+      properties:
+        groupId:
+          type: string
+        groupName:
+          type: string
+
+    UserGroupMembershipsResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserGroupMembership"
+
+    TeamCompletionSummary:
+      type: object
+      required: [completed, pending, overdue, total]
+      properties:
+        completed:
+          type: integer
+        pending:
+          type: integer
+        overdue:
+          type: integer
+        total:
+          type: integer
+
     TeamCompletionUser:
       type: object
       required: [id, email, firstName, lastName, role]
@@ -2326,9 +2401,8 @@ components:
         role:
           $ref: "#/components/schemas/UserRole"
         completionSummary:
-          type: object
+          $ref: "#/components/schemas/TeamCompletionSummary"
           nullable: true
-          additionalProperties: true
 
     TeamCompletionResponse:
       type: object

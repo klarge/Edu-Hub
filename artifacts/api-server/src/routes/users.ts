@@ -1,12 +1,15 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { eq, like, and, inArray, sql, or } from "drizzle-orm";
+import { eq, like, and, inArray, sql, or, gte, lte } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   usersTable,
   userTagGroupsTable,
   apiKeysTable,
   auditLogTable,
+  completionRecordsTable,
+  trainingGroupAssignmentsTable,
+  tagGroupsTable,
 } from "@workspace/db/schema";
 import { authenticate } from "../middlewares/auth.js";
 import { requireRole, requireMinRole } from "../middlewares/requireRole.js";
@@ -382,6 +385,8 @@ router.delete("/users/:id/api-keys/:keyId", authenticate, async (req: Request, r
 // ─── Manager Team Completion Status ──────────────────────────────────────────
 
 router.get("/users/team/completion-status", authenticate, requireRole("manager"), async (req: Request, res: Response) => {
+  const { trainingId, fromDate, toDate } = req.query as Record<string, string | undefined>;
+
   const managerGroups = await db
     .select({ tagGroupId: userTagGroupsTable.tagGroupId })
     .from(userTagGroupsTable)
@@ -401,23 +406,106 @@ router.get("/users/team/completion-status", authenticate, requireRole("manager")
 
   const userIds = [...new Set(usersInGroups.map((u) => u.userId))];
 
-  const teamUsers = await db
-    .select()
-    .from(usersTable)
-    .where(and(inArray(usersTable.id, userIds), eq(usersTable.isActive, true)));
+  const [teamUsers, allAssignments] = await Promise.all([
+    db
+      .select()
+      .from(usersTable)
+      .where(and(inArray(usersTable.id, userIds), eq(usersTable.isActive, true))),
+    db
+      .select({
+        trainingId: trainingGroupAssignmentsTable.trainingId,
+        groupId: trainingGroupAssignmentsTable.groupId,
+        dueDate: trainingGroupAssignmentsTable.dueDate,
+      })
+      .from(trainingGroupAssignmentsTable)
+      .where(
+        and(
+          inArray(trainingGroupAssignmentsTable.groupId, groupIds),
+          ...(trainingId ? [eq(trainingGroupAssignmentsTable.trainingId, trainingId)] : []),
+        ),
+      ),
+  ]);
 
-  // Completion data will be added in Task #2 when the completions table exists.
-  // For now return user roster with empty completion summary.
+  const assignedTrainingIds = [...new Set(allAssignments.map((a) => a.trainingId))];
+
+  const dueDateByTraining = new Map<string, string | null>();
+  for (const a of allAssignments) {
+    const existing = dueDateByTraining.get(a.trainingId);
+    if (a.dueDate) {
+      if (!existing || a.dueDate < existing) {
+        dueDateByTraining.set(a.trainingId, a.dueDate);
+      }
+    } else if (!dueDateByTraining.has(a.trainingId)) {
+      dueDateByTraining.set(a.trainingId, null);
+    }
+  }
+
+  const completionConditions = [
+    inArray(completionRecordsTable.userId, userIds),
+    ...(trainingId ? [eq(completionRecordsTable.trainingId, trainingId)] : []),
+    ...(fromDate ? [gte(completionRecordsTable.completedAt, new Date(fromDate))] : []),
+    ...(toDate ? [lte(completionRecordsTable.completedAt, new Date(toDate + "T23:59:59Z"))] : []),
+  ];
+
+  const allCompletions = await db
+    .select({
+      userId: completionRecordsTable.userId,
+      trainingId: completionRecordsTable.trainingId,
+    })
+    .from(completionRecordsTable)
+    .where(and(...completionConditions));
+
+  const completionsByUser = new Map<string, Set<string>>();
+  for (const c of allCompletions) {
+    if (c.trainingId) {
+      if (!completionsByUser.has(c.userId)) completionsByUser.set(c.userId, new Set());
+      completionsByUser.get(c.userId)!.add(c.trainingId);
+    }
+  }
+
+  const now = new Date();
+
   res.json({
-    users: teamUsers.map((u) => ({
-      id: u.id,
-      email: u.email,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      role: u.role,
-      completionSummary: null,
-    })),
+    users: teamUsers.map((u) => {
+      const completedTrainings = completionsByUser.get(u.id) ?? new Set<string>();
+      const completed = assignedTrainingIds.filter((tid) => completedTrainings.has(tid)).length;
+      const overdueCount = assignedTrainingIds.filter((tid) => {
+        if (completedTrainings.has(tid)) return false;
+        const due = dueDateByTraining.get(tid);
+        return !!due && new Date(due) < now;
+      }).length;
+      const pending = Math.max(0, assignedTrainingIds.length - completed - overdueCount);
+      return {
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role,
+        completionSummary: {
+          completed,
+          pending,
+          overdue: overdueCount,
+          total: assignedTrainingIds.length,
+        },
+      };
+    }),
   });
+});
+
+// GET /users/:id/groups — list groups a user belongs to (admin only)
+router.get("/users/:id/groups", authenticate, requireRole("admin"), async (req: Request, res: Response) => {
+  const { id } = req.params as { id: string };
+
+  const memberships = await db
+    .select({
+      groupId: userTagGroupsTable.tagGroupId,
+      groupName: tagGroupsTable.name,
+    })
+    .from(userTagGroupsTable)
+    .innerJoin(tagGroupsTable, eq(userTagGroupsTable.tagGroupId, tagGroupsTable.id))
+    .where(eq(userTagGroupsTable.userId, id));
+
+  res.json({ groups: memberships });
 });
 
 export default router;

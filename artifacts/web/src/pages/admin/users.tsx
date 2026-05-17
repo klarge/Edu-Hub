@@ -7,7 +7,12 @@ import {
   useCreateUser,
   useUpdateUser,
   useDeactivateUser,
+  useGetUserGroups,
+  useListGroups,
+  useAddGroupMember,
+  useRemoveGroupMember,
   getListUsersQueryKey,
+  getGetUserGroupsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -33,7 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useImportUsers, getListUsersQueryKey as _getListUsersQueryKey } from "@workspace/api-client-react";
-import { Users, Plus, Search, Pencil, UserX, Upload, FileText, AlertCircle } from "lucide-react";
+import { Users, Plus, Search, Pencil, UserX, Upload, FileText, AlertCircle, X as XIcon } from "lucide-react";
 import type { User, ImportUserRecord } from "@workspace/api-client-react";
 
 const ROLES = ["admin", "training_lead", "manager", "user"] as const;
@@ -60,6 +65,163 @@ const editSchema = z.object({
 });
 type EditForm = z.infer<typeof editSchema>;
 
+function EditUserDialog({ user, onClose }: { user: User; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [addGroupId, setAddGroupId] = useState("");
+
+  const updateUser = useUpdateUser();
+  const addMember = useAddGroupMember();
+  const removeMember = useRemoveGroupMember();
+
+  const { data: userGroupsData, isLoading: groupsLoading } = useGetUserGroups(user.id, {
+    query: { queryKey: getGetUserGroupsQueryKey(user.id) },
+  });
+  const { data: allGroupsData } = useListGroups();
+
+  const currentGroups = userGroupsData?.groups ?? [];
+  const currentGroupIds = new Set(currentGroups.map((g) => g.groupId));
+  const availableGroups = (allGroupsData?.groups ?? []).filter((g) => !currentGroupIds.has(g.id));
+
+  function invalidateGroups() {
+    queryClient.invalidateQueries({ queryKey: getGetUserGroupsQueryKey(user.id) });
+  }
+
+  const form = useForm<EditForm>({
+    resolver: zodResolver(editSchema),
+    defaultValues: { firstName: user.firstName, lastName: user.lastName, role: user.role as EditForm["role"] },
+  });
+
+  function onSubmit(values: EditForm) {
+    updateUser.mutate(
+      { id: user.id, data: values },
+      {
+        onSuccess: () => {
+          toast({ title: "User updated" });
+          queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+          onClose();
+        },
+        onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleAddGroup() {
+    if (!addGroupId) return;
+    addMember.mutate(
+      { id: addGroupId, data: { userId: user.id } },
+      {
+        onSuccess: () => { toast({ title: "Added to group" }); invalidateGroups(); setAddGroupId(""); },
+        onError: () => toast({ title: "Failed to add to group", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleRemoveGroup(groupId: string) {
+    removeMember.mutate(
+      { id: groupId, userId: user.id },
+      {
+        onSuccess: () => { toast({ title: "Removed from group" }); invalidateGroups(); },
+        onError: () => toast({ title: "Failed to remove from group", variant: "destructive" }),
+      }
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
+        <div className="space-y-5">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input {...form.register("firstName")} data-testid="input-edit-first-name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input {...form.register("lastName")} data-testid="input-edit-last-name" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role</Label>
+              <select
+                {...form.register("role")}
+                data-testid="select-edit-user-role"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="submit" disabled={updateUser.isPending} data-testid="button-update-user">Save Changes</Button>
+            </div>
+          </form>
+
+          <div className="border-t border-border pt-4 space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Group Memberships</p>
+            {groupsLoading ? (
+              <Skeleton className="h-8 w-full" />
+            ) : currentGroups.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Not a member of any group</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {currentGroups.map((g) => (
+                  <Badge
+                    key={g.groupId}
+                    variant="secondary"
+                    className="flex items-center gap-1 pr-1"
+                    data-testid={`badge-group-${g.groupId}`}
+                  >
+                    {g.groupName}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveGroup(g.groupId)}
+                      className="ml-0.5 rounded hover:bg-muted-foreground/20 p-0.5"
+                      data-testid={`button-remove-group-${g.groupId}`}
+                    >
+                      <XIcon className="h-2.5 w-2.5" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {availableGroups.length > 0 && (
+              <div className="flex gap-2">
+                <select
+                  value={addGroupId}
+                  onChange={(e) => setAddGroupId(e.target.value)}
+                  data-testid="select-add-group"
+                  className="flex h-8 flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Add to group…</option>
+                  {availableGroups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!addGroupId || addMember.isPending}
+                  onClick={handleAddGroup}
+                  data-testid="button-add-group"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Add
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -76,17 +238,12 @@ export default function AdminUsersPage() {
   const limit = 20;
   const { data, isLoading } = useListUsers({ page, limit, search: search || undefined });
   const createUser = useCreateUser();
-  const updateUser = useUpdateUser();
   const deactivate = useDeactivateUser();
   const importUsers = useImportUsers();
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
     defaultValues: { email: "", password: "", firstName: "", lastName: "", role: "user" },
-  });
-  const editForm = useForm<EditForm>({
-    resolver: zodResolver(editSchema),
-    defaultValues: { firstName: "", lastName: "", role: "user" },
   });
 
   const users = data?.users ?? [];
@@ -110,21 +267,6 @@ export default function AdminUsersPage() {
     );
   }
 
-  function openEdit(u: User) {
-    setEditingUser(u);
-    editForm.reset({ firstName: u.firstName, lastName: u.lastName, role: u.role as typeof ROLES[number] });
-  }
-
-  function onEditSubmit(values: EditForm) {
-    if (!editingUser) return;
-    updateUser.mutate(
-      { id: editingUser.id, data: values },
-      {
-        onSuccess: () => { toast({ title: "User updated" }); invalidate(); setEditingUser(null); },
-        onError: () => toast({ title: "Failed to update", variant: "destructive" }),
-      }
-    );
-  }
 
   function getInitials(u: User) {
     return `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
@@ -275,7 +417,7 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingUser(u)} data-testid={`button-edit-user-${u.id}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         {u.isActive && (
@@ -372,39 +514,12 @@ export default function AdminUsersPage() {
       </Dialog>
 
       {/* Edit user dialog */}
-      <Dialog open={!!editingUser} onOpenChange={(o) => { if (!o) setEditingUser(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
-          <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>First Name</Label>
-                <Input {...editForm.register("firstName")} data-testid="input-edit-first-name" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Last Name</Label>
-                <Input {...editForm.register("lastName")} data-testid="input-edit-last-name" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Role</Label>
-              <select
-                {...editForm.register("role")}
-                data-testid="select-edit-user-role"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
-              <Button type="submit" disabled={updateUser.isPending} data-testid="button-update-user">Save Changes</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {editingUser && (
+        <EditUserDialog
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+        />
+      )}
 
       {/* Import CSV dialog */}
       <Dialog open={showImport} onOpenChange={(o) => { if (!o) setShowImport(false); }}>

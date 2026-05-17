@@ -392,8 +392,29 @@ export const RemoveGroupMemberResponse = zod.object({
 
 
 /**
+ * @summary Get groups a user belongs to (admin only)
+ */
+export const GetUserGroupsParams = zod.object({
+  "id": zod.coerce.string().describe('User UUID')
+})
+
+export const GetUserGroupsResponse = zod.object({
+  "groups": zod.array(zod.object({
+  "groupId": zod.string(),
+  "groupName": zod.string()
+}))
+})
+
+
+/**
  * @summary Get completion status for manager's team members (manager only)
  */
+export const GetTeamCompletionStatusQueryParams = zod.object({
+  "trainingId": zod.coerce.string().optional().describe('Filter completion data to a specific training'),
+  "fromDate": zod.date().optional().describe('Filter completions from this date (ISO date string)'),
+  "toDate": zod.date().optional().describe('Filter completions up to this date (ISO date string)')
+})
+
 export const GetTeamCompletionStatusResponse = zod.object({
   "users": zod.array(zod.object({
   "id": zod.string(),
@@ -401,7 +422,12 @@ export const GetTeamCompletionStatusResponse = zod.object({
   "firstName": zod.string(),
   "lastName": zod.string(),
   "role": zod.enum(['admin', 'training_lead', 'manager', 'user']),
-  "completionSummary": zod.record(zod.string(), zod.unknown()).nullish()
+  "completionSummary": zod.object({
+  "completed": zod.number(),
+  "pending": zod.number(),
+  "overdue": zod.number(),
+  "total": zod.number()
+}).nullish()
 }))
 })
 

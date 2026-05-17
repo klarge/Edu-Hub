@@ -6,4 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type TeamCompletionUserCompletionSummary = { [key: string]: unknown } | null;
+export interface TeamCompletionSummary {
+  completed: number;
+  pending: number;
+  overdue: number;
+  total: number;
+}

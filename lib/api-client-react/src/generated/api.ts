@@ -47,6 +47,7 @@ import type {
   EventResponse,
   GenerateAttendanceCodeBody,
   GetAuditLogParams,
+  GetTeamCompletionStatusParams,
   GroupListResponse,
   GroupMemberListResponse,
   GroupResponse,
@@ -98,6 +99,7 @@ import type {
   UploadPptxBody,
   UploadScormBody,
   UserDetailResponse,
+  UserGroupMembershipsResponse,
   UserResponse,
   UserRole
 } from './api.schemas';
@@ -2058,20 +2060,20 @@ export const useRemoveGroupMember = <TError = ErrorType<unknown>,
       return useMutation(getRemoveGroupMemberMutationOptions(options));
     }
 
-export const getGetTeamCompletionStatusUrl = () => {
+export const getGetUserGroupsUrl = (id: string,) => {
 
 
 
 
-  return `/api/users/team/completion-status`
+  return `/api/users/${id}/groups`
 }
 
 /**
- * @summary Get completion status for manager's team members (manager only)
+ * @summary Get groups a user belongs to (admin only)
  */
-export const getTeamCompletionStatus = async ( options?: RequestInit): Promise<TeamCompletionResponse> => {
+export const getUserGroups = async (id: string, options?: RequestInit): Promise<UserGroupMembershipsResponse> => {
 
-  return customFetch<TeamCompletionResponse>(getGetTeamCompletionStatusUrl(),
+  return customFetch<UserGroupMembershipsResponse>(getGetUserGroupsUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2084,23 +2086,107 @@ export const getTeamCompletionStatus = async ( options?: RequestInit): Promise<T
 
 
 
-export const getGetTeamCompletionStatusQueryKey = () => {
+export const getGetUserGroupsQueryKey = (id: string,) => {
     return [
-    `/api/users/team/completion-status`
+    `/api/users/${id}/groups`
     ] as const;
     }
 
 
-export const getGetTeamCompletionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetUserGroupsQueryOptions = <TData = Awaited<ReturnType<typeof getUserGroups>>, TError = ErrorType<ErrorResponse>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTeamCompletionStatusQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetUserGroupsQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeamCompletionStatus>>> = ({ signal }) => getTeamCompletionStatus({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserGroups>>> = ({ signal }) => getUserGroups(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserGroups>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserGroupsQueryResult = NonNullable<Awaited<ReturnType<typeof getUserGroups>>>
+export type GetUserGroupsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get groups a user belongs to (admin only)
+ */
+
+export function useGetUserGroups<TData = Awaited<ReturnType<typeof getUserGroups>>, TError = ErrorType<ErrorResponse>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserGroupsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTeamCompletionStatusUrl = (params?: GetTeamCompletionStatusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/users/team/completion-status?${stringifiedParams}` : `/api/users/team/completion-status`
+}
+
+/**
+ * @summary Get completion status for manager's team members (manager only)
+ */
+export const getTeamCompletionStatus = async (params?: GetTeamCompletionStatusParams, options?: RequestInit): Promise<TeamCompletionResponse> => {
+
+  return customFetch<TeamCompletionResponse>(getGetTeamCompletionStatusUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTeamCompletionStatusQueryKey = (params?: GetTeamCompletionStatusParams,) => {
+    return [
+    `/api/users/team/completion-status`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTeamCompletionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError = ErrorType<ErrorResponse>>(params?: GetTeamCompletionStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTeamCompletionStatusQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeamCompletionStatus>>> = ({ signal }) => getTeamCompletionStatus(params, { signal, ...requestOptions });
 
 
 
@@ -2118,11 +2204,11 @@ export type GetTeamCompletionStatusQueryError = ErrorType<ErrorResponse>
  */
 
 export function useGetTeamCompletionStatus<TData = Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError = ErrorType<ErrorResponse>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetTeamCompletionStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamCompletionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetTeamCompletionStatusQueryOptions(options)
+  const queryOptions = getGetTeamCompletionStatusQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

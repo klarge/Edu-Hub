@@ -5,7 +5,7 @@
  * Training Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { TeamCompletionUserCompletionSummary } from './teamCompletionUserCompletionSummary';
+import type { TeamCompletionSummary } from './teamCompletionSummary';
 import type { UserRole } from './userRole';
 
 export interface TeamCompletionUser {
@@ -14,5 +14,5 @@ export interface TeamCompletionUser {
   firstName: string;
   lastName: string;
   role: UserRole;
-  completionSummary?: TeamCompletionUserCompletionSummary;
+  completionSummary?: TeamCompletionSummary | null;
 }

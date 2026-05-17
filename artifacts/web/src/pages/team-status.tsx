@@ -40,7 +40,6 @@ function parseSummary(raw: unknown): CompletionSummary {
 }
 
 export default function TeamStatusPage() {
-  const { data, isLoading } = useGetTeamCompletionStatus();
   const { data: trainingsData } = useListTrainings({ limit: 200 });
 
   const [search, setSearch] = useState("");
@@ -49,28 +48,23 @@ export default function TeamStatusPage() {
   const [toDate, setToDate] = useState("");
 
   const trainings = trainingsData?.trainings ?? [];
+
+  const { data, isLoading } = useGetTeamCompletionStatus(
+    {
+      trainingId: trainingFilter || undefined,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    },
+  );
+
   const allUsers = data?.users ?? [];
 
-  const users = allUsers.filter((u) => {
-    if (
-      search &&
-      !`${u.firstName} ${u.lastName} ${u.email}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    ) {
-      return false;
-    }
-    const summary = parseSummary(u.completionSummary);
-    if (trainingFilter) {
-      const completed = summary?.completed ?? 0;
-      if (completed === 0) return false;
-    }
-    if (fromDate || toDate) {
-      const completedCount = summary?.completed ?? 0;
-      if (completedCount === 0) return false;
-    }
-    return true;
-  });
+  const users = allUsers.filter((u) =>
+    !search ||
+    `${u.firstName} ${u.lastName} ${u.email}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
   const hasFilters = !!trainingFilter || !!fromDate || !!toDate;
   function clearFilters() {
