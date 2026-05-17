@@ -1314,6 +1314,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /trainings/{id}/content/{contentId}/viewed:
+    post:
+      operationId: markContentViewed
+      tags: [trainings]
+      summary: Mark a training content item as viewed by the current user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TrainingId"
+        - in: path
+          name: contentId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Content marked as viewed; trainingCompleted indicates full completion
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, trainingCompleted]
+                properties:
+                  success:
+                    type: boolean
+                  trainingCompleted:
+                    type: boolean
+
   /trainings/{id}/quiz/submit:
     post:
       operationId: submitQuiz
@@ -2804,7 +2832,7 @@ components:
 
     QuizSubmitResponse:
       type: object
-      required: [attempt, score, passed, passingScore]
+      required: [attempt, score, passed, passingScore, trainingCompleted]
       properties:
         attempt:
           $ref: "#/components/schemas/QuizAttempt"
@@ -2814,6 +2842,9 @@ components:
           type: boolean
         passingScore:
           type: integer
+        trainingCompleted:
+          type: boolean
+          description: True if the training is now fully completed (quiz passed + all content viewed)
 
     QuizAttemptListResponse:
       type: object

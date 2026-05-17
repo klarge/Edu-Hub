@@ -921,6 +921,20 @@ export const DeleteQuizQuestionResponse = zod.object({
 
 
 /**
+ * @summary Mark a training content item as viewed by the current user
+ */
+export const MarkContentViewedParams = zod.object({
+  "id": zod.coerce.string().describe('Training UUID'),
+  "contentId": zod.coerce.string()
+})
+
+export const MarkContentViewedResponse = zod.object({
+  "success": zod.boolean(),
+  "trainingCompleted": zod.boolean()
+})
+
+
+/**
  * @summary Submit quiz answers and get a score
  */
 export const SubmitQuizParams = zod.object({
@@ -943,7 +957,8 @@ export const SubmitQuizResponse = zod.object({
 }),
   "score": zod.number(),
   "passed": zod.boolean(),
-  "passingScore": zod.number()
+  "passingScore": zod.number(),
+  "trainingCompleted": zod.boolean().describe('True if the training is now fully completed (quiz passed + all content viewed)')
 })
 
 

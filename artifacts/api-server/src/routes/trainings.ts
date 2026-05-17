@@ -535,7 +535,14 @@ router.post(
           userId: req.user!.id,
           contentId: item.id,
           trainingId: id,
+          score: score ?? null,
         });
+      } else if (score !== undefined) {
+        // Update the persisted score if a new score is provided
+        await db
+          .update(contentViewsTable)
+          .set({ score })
+          .where(eq(contentViewsTable.id, existingView.id));
       }
     }
 

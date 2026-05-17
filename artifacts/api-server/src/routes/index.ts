@@ -9,6 +9,7 @@ import trainingsRouter from "./trainings.js";
 import quizzesRouter from "./quizzes.js";
 import eventsRouter from "./events.js";
 import completionsRouter from "./completions.js";
+import uploadsRouter from "./uploads.js";
 
 const router: IRouter = Router();
 
@@ -23,5 +24,7 @@ router.use(settingsRouter);
 router.use(trainingsRouter);
 router.use(quizzesRouter);
 router.use(eventsRouter);
+// Authenticated file download routes — must come after auth middleware is wired
+router.use(uploadsRouter);
 
 export default router;

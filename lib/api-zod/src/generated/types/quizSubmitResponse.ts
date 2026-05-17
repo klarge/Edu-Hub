@@ -12,4 +12,6 @@ export interface QuizSubmitResponse {
   score: number;
   passed: boolean;
   passingScore: number;
+  /** True if the training is now fully completed (quiz passed + all content viewed) */
+  trainingCompleted: boolean;
 }

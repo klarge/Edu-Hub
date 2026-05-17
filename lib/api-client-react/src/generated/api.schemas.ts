@@ -543,6 +543,8 @@ export interface QuizSubmitResponse {
   score: number;
   passed: boolean;
   passingScore: number;
+  /** True if the training is now fully completed (quiz passed + all content viewed) */
+  trainingCompleted: boolean;
 }
 
 export interface QuizAttemptListResponse {
@@ -657,6 +659,11 @@ export type ScormCompleteBody = {
   score?: number;
   /** Specific SCORM content item UUID to mark as viewed (marks all SCORM items if omitted) */
   contentId?: string;
+};
+
+export type MarkContentViewed200 = {
+  success: boolean;
+  trainingCompleted: boolean;
 };
 
 export type ListEventsParams = {

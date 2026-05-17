@@ -54,6 +54,7 @@ export const contentViewsTable = pgTable("content_views", {
   trainingId: uuid("training_id")
     .notNull()
     .references(() => trainingsTable.id, { onDelete: "cascade" }),
+  score: integer("score"),
   viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

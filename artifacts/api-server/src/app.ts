@@ -40,15 +40,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Serve uploaded SCORM packages and PPTX files
-app.use(
-  "/api/uploads/scorm",
-  express.static(path.join(UPLOAD_DIR, "scorm"), { dotfiles: "deny" }),
-);
-app.use(
-  "/api/uploads/pptx",
-  express.static(path.join(UPLOAD_DIR, "pptx"), { dotfiles: "deny" }),
-);
+// NOTE: /api/uploads/scorm and /api/uploads/pptx are served via authenticated
+// gated routes in routes/uploads.ts (mounted below). No public express.static.
 
 app.use("/api", router);
 

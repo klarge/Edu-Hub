@@ -60,6 +60,7 @@ import type {
   LoginRequest,
   LoginResponse,
   ManualMarkAttendanceBody,
+  MarkContentViewed200,
   MeResponse,
   OAuthProvider,
   OauthCallbackParams,
@@ -4289,6 +4290,78 @@ export const useDeleteQuizQuestion = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteQuizQuestionMutationOptions(options));
+    }
+
+export const getMarkContentViewedUrl = (id: string,
+    contentId: string,) => {
+
+
+
+
+  return `/api/trainings/${id}/content/${contentId}/viewed`
+}
+
+/**
+ * @summary Mark a training content item as viewed by the current user
+ */
+export const markContentViewed = async (id: string,
+    contentId: string, options?: RequestInit): Promise<MarkContentViewed200> => {
+
+  return customFetch<MarkContentViewed200>(getMarkContentViewedUrl(id,contentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMarkContentViewedMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markContentViewed>>, TError,{id: string;contentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markContentViewed>>, TError,{id: string;contentId: string}, TContext> => {
+
+const mutationKey = ['markContentViewed'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markContentViewed>>, {id: string;contentId: string}> = (props) => {
+          const {id,contentId} = props ?? {};
+
+          return  markContentViewed(id,contentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkContentViewedMutationResult = NonNullable<Awaited<ReturnType<typeof markContentViewed>>>
+
+    export type MarkContentViewedMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark a training content item as viewed by the current user
+ */
+export const useMarkContentViewed = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markContentViewed>>, TError,{id: string;contentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markContentViewed>>,
+        TError,
+        {id: string;contentId: string},
+        TContext
+      > => {
+      return useMutation(getMarkContentViewedMutationOptions(options));
     }
 
 export const getSubmitQuizUrl = (id: string,) => {
