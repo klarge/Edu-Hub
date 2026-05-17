@@ -346,8 +346,10 @@ router.delete(
   async (req: Request, res: Response) => {
     const { id, userId } = req.params as { id: string; userId: string };
 
-    // Users can unregister themselves; leads/admins can unregister anyone
-    if (req.user!.role === "user" && req.user!.id !== userId) {
+    // Self-service unregister is allowed for any role.
+    // Unregistering ANOTHER user requires training_lead or above.
+    const SELF_ONLY_ROLES: string[] = ["user", "manager"];
+    if (SELF_ONLY_ROLES.includes(req.user!.role) && req.user!.id !== userId) {
       res.status(403).json({ error: "Cannot unregister other users" });
       return;
     }
