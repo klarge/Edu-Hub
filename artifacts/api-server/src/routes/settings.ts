@@ -159,6 +159,51 @@ router.get("/settings/public", async (_req: Request, res: Response) => {
   res.json({ settings });
 });
 
+// POST /settings/test-email — send a test email to verify SMTP config
+router.post("/settings/test-email", authenticate, requireRole("admin"), async (req: Request, res: Response) => {
+  const { to } = req.body as { to?: string };
+  if (!to) {
+    res.status(400).json({ error: "Recipient 'to' address is required" });
+    return;
+  }
+
+  // Read SMTP settings from the DB
+  const rows = await db.select().from(appSettingsTable);
+  const settings: Record<string, string> = {};
+  for (const row of rows) settings[row.key] = row.value;
+
+  const host = settings["smtp_host"];
+  const port = parseInt(settings["smtp_port"] ?? "587");
+  const user = settings["smtp_user"];
+  const pass = settings["smtp_password"];
+  const from = settings["smtp_from"] ?? user ?? "no-reply@example.com";
+
+  if (!host) {
+    res.status(422).json({ error: "SMTP host is not configured. Save your settings first." });
+    return;
+  }
+
+  try {
+    const { createTransport } = await import("nodemailer");
+    const transport = createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: user && pass ? { user, pass } : undefined,
+    });
+    await transport.sendMail({
+      from,
+      to,
+      subject: "TrainHub – SMTP Test",
+      text: "This is a test email from your TrainHub installation. If you received it, your SMTP settings are working correctly.",
+    });
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(502).json({ error: `Failed to send email: ${message}` });
+  }
+});
+
 // ─── Audit Log ─────────────────────────────────────────────────────────────────
 
 // GET /settings/audit-log

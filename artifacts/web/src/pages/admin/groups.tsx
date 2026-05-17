@@ -60,7 +60,7 @@ function GroupMembersPanel({ groupId }: { groupId: string }) {
 
   const members = membersData?.members ?? [];
   const allUsers = usersData?.users ?? [];
-  const memberIds = new Set(members.map((m) => m.id));
+  const memberIds = new Set(members.map((m) => m.userId));
   const nonMembers = allUsers.filter((u) => !memberIds.has(u.id));
 
   function invalidate() {
@@ -125,8 +125,8 @@ function GroupMembersPanel({ groupId }: { groupId: string }) {
         <div className="space-y-1.5">
           {members.map((m) => (
             <div
-              key={m.id}
-              data-testid={`row-member-${m.id}`}
+              key={m.userId}
+              data-testid={`row-member-${m.userId}`}
               className="flex items-center justify-between p-2.5 bg-card border border-border rounded-lg"
             >
               <div>
@@ -137,8 +137,8 @@ function GroupMembersPanel({ groupId }: { groupId: string }) {
                 size="sm"
                 variant="ghost"
                 className="text-destructive"
-                onClick={() => handleRemove(m.id)}
-                data-testid={`button-remove-member-${m.id}`}
+                onClick={() => handleRemove(m.userId)}
+                data-testid={`button-remove-member-${m.userId}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>

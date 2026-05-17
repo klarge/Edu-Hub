@@ -1,9 +1,11 @@
+import { useState } from "react";
 import {
   useGetTeamCompletionStatus,
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart2, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { BarChart2, CheckCircle2, Clock, AlertTriangle, Search } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -16,9 +18,44 @@ function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
+type CompletionSummary = {
+  completed?: number;
+  pending?: number;
+  overdue?: number;
+  total?: number;
+} | null;
+
+function parseSummary(raw: unknown): CompletionSummary {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  return {
+    completed: typeof s.completed === "number" ? s.completed : 0,
+    pending: typeof s.pending === "number" ? s.pending : 0,
+    overdue: typeof s.overdue === "number" ? s.overdue : 0,
+    total: typeof s.total === "number" ? s.total : 0,
+  };
+}
+
 export default function TeamStatusPage() {
   const { data, isLoading } = useGetTeamCompletionStatus();
-  const users = data?.users ?? [];
+  const [search, setSearch] = useState("");
+
+  const allUsers = data?.users ?? [];
+  const users = allUsers.filter(
+    (u) =>
+      !search ||
+      `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalMembers = allUsers.length;
+  const totalCompleted = allUsers.reduce((sum, u) => {
+    const s = parseSummary(u.completionSummary);
+    return sum + (s?.completed ?? 0);
+  }, 0);
+  const totalOverdue = allUsers.reduce((sum, u) => {
+    const s = parseSummary(u.completionSummary);
+    return sum + (s?.overdue ?? 0);
+  }, 0);
 
   return (
     <div className="space-y-5">
@@ -33,8 +70,46 @@ export default function TeamStatusPage() {
           </p>
         </div>
         {!isLoading && (
-          <Badge variant="secondary">{users.length} members</Badge>
+          <Badge variant="secondary">{totalMembers} members</Badge>
         )}
+      </div>
+
+      {/* Summary stats */}
+      {!isLoading && totalMembers > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card border border-border rounded-lg p-3 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">Total Completions</p>
+              <p className="text-lg font-semibold">{totalCompleted}</p>
+            </div>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">Overdue</p>
+              <p className="text-lg font-semibold">{totalOverdue}</p>
+            </div>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">Active Members</p>
+              <p className="text-lg font-semibold">{totalMembers}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search members..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-8"
+          data-testid="input-search-team"
+        />
       </div>
 
       {isLoading ? (
@@ -44,7 +119,9 @@ export default function TeamStatusPage() {
       ) : users.length === 0 ? (
         <div className="bg-muted rounded-lg p-12 text-center">
           <BarChart2 className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm font-medium">No team members found</p>
+          <p className="text-sm font-medium">
+            {search ? "No members match your search" : "No team members found"}
+          </p>
           <p className="text-xs text-muted-foreground mt-1">
             Users in your managed groups will appear here
           </p>
@@ -56,12 +133,20 @@ export default function TeamStatusPage() {
               <tr className="border-b border-border bg-muted/40">
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Member</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Role</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Completion Summary</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Completed</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Pending</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Overdue</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Progress</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {users.map((u) => {
-                const summary = u.completionSummary as Record<string, unknown> | null;
+                const summary = parseSummary(u.completionSummary);
+                const completed = summary?.completed ?? 0;
+                const pending = summary?.pending ?? 0;
+                const overdue = summary?.overdue ?? 0;
+                const total = summary?.total ?? (completed + pending + overdue);
+                const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
                 return (
                   <tr
                     key={u.id}
@@ -86,16 +171,38 @@ export default function TeamStatusPage() {
                         {ROLE_LABELS[u.role] ?? u.role}
                       </Badge>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {completed}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-muted-foreground">{pending}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {overdue > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-destructive font-medium">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          {overdue}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
-                      {summary ? (
+                      {total > 0 ? (
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          <span className="text-xs text-muted-foreground">
-                            {JSON.stringify(summary)}
-                          </span>
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No data</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                   </tr>

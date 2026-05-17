@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Mail } from "lucide-react";
+import { Mail, Send } from "lucide-react";
 
 const schema = z.object({
   smtp_host: z.string().optional(),
@@ -29,6 +29,8 @@ export default function AdminSMTPPage() {
   const { toast } = useToast();
   const { data, isLoading } = useGetSettings();
   const update = useUpdateSettings();
+  const [testEmail, setTestEmail] = useState("");
+  const [isTesting, setIsTesting] = useState(false);
 
   const form = useForm<SmtpForm>({
     resolver: zodResolver(schema),
@@ -69,6 +71,36 @@ export default function AdminSMTPPage() {
         onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
       }
     );
+  }
+
+  async function handleSendTest() {
+    if (!testEmail) {
+      toast({ title: "Enter a recipient email address", variant: "destructive" });
+      return;
+    }
+    setIsTesting(true);
+    try {
+      const res = await fetch("/api/settings/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: testEmail }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        toast({ title: "Test email sent", description: `Message dispatched to ${testEmail}` });
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast({
+          title: "Failed to send test email",
+          description: (body as { error?: string }).error ?? "Check your SMTP settings and try again",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Could not reach the server", variant: "destructive" });
+    } finally {
+      setIsTesting(false);
+    }
   }
 
   return (
@@ -136,13 +168,40 @@ export default function AdminSMTPPage() {
             />
           </div>
 
-          <div className="pt-2">
+          <div className="pt-2 flex gap-2">
             <Button type="submit" disabled={update.isPending} data-testid="button-save-smtp">
               {update.isPending ? "Saving..." : "Save Settings"}
             </Button>
           </div>
         </form>
       )}
+
+      {/* Test email */}
+      <div className="max-w-lg border-t border-border pt-5">
+        <p className="text-sm font-medium mb-2">Send Test Email</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          Verify your SMTP configuration by sending a test message.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="recipient@example.com"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            className="flex-1"
+            data-testid="input-test-email-to"
+          />
+          <Button
+            variant="outline"
+            onClick={handleSendTest}
+            disabled={isTesting}
+            data-testid="button-send-test-email"
+          >
+            <Send className="h-4 w-4 mr-1.5" />
+            {isTesting ? "Sending..." : "Send Test"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

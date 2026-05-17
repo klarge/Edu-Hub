@@ -32,8 +32,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Users, Plus, Search, Pencil, UserX } from "lucide-react";
-import type { User } from "@workspace/api-client-react";
+import { useImportUsers, getListUsersQueryKey as _getListUsersQueryKey } from "@workspace/api-client-react";
+import { Users, Plus, Search, Pencil, UserX, Upload, FileText, AlertCircle } from "lucide-react";
+import type { User, ImportUserRecord } from "@workspace/api-client-react";
 
 const ROLES = ["admin", "training_lead", "manager", "user"] as const;
 const ROLE_LABELS: Record<string, string> = {
@@ -67,12 +68,17 @@ export default function AdminUsersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [importPreview, setImportPreview] = useState<ImportUserRecord[]>([]);
+  const [importError, setImportError] = useState("");
 
   const limit = 20;
   const { data, isLoading } = useListUsers({ page, limit, search: search || undefined });
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deactivate = useDeactivateUser();
+  const importUsers = useImportUsers();
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -124,6 +130,69 @@ export default function AdminUsersPage() {
     return `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
   }
 
+  function parseCsv(text: string): { records: ImportUserRecord[]; error: string } {
+    const lines = text.trim().split("\n").filter((l) => l.trim());
+    if (lines.length < 2) return { records: [], error: "CSV must have a header row and at least one data row" };
+    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    if (!headers.includes("email")) return { records: [], error: "CSV must include an 'email' column" };
+    const records: ImportUserRecord[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => { row[h] = values[idx] ?? ""; });
+      if (!row.email) continue;
+      records.push({
+        email: row.email,
+        firstName: row.firstname || row.first_name || undefined,
+        lastName: row.lastname || row.last_name || undefined,
+        role: (["admin", "training_lead", "manager", "user"].includes(row.role) ? row.role : "user") as ImportUserRecord["role"],
+        password: row.password || undefined,
+      });
+    }
+    if (records.length === 0) return { records: [], error: "No valid rows found in CSV" };
+    return { records, error: "" };
+  }
+
+  function handleCsvChange(text: string) {
+    setCsvText(text);
+    setImportError("");
+    if (!text.trim()) { setImportPreview([]); return; }
+    const { records, error } = parseCsv(text);
+    if (error) { setImportError(error); setImportPreview([]); }
+    else setImportPreview(records);
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => handleCsvChange(ev.target?.result as string ?? "");
+    reader.readAsText(file);
+  }
+
+  function onImportSubmit() {
+    if (importPreview.length === 0) return;
+    importUsers.mutate(
+      { data: { users: importPreview } },
+      {
+        onSuccess: (result) => {
+          const succeeded = result.results?.filter((r) => r.status === "created").length ?? importPreview.length;
+          const failed = result.results?.filter((r) => r.status === "error").length ?? 0;
+          toast({
+            title: `Import complete`,
+            description: `${succeeded} created${failed > 0 ? `, ${failed} failed` : ""}`,
+            variant: failed > 0 ? "destructive" : "default",
+          });
+          invalidate();
+          setShowImport(false);
+          setCsvText("");
+          setImportPreview([]);
+        },
+        onError: () => toast({ title: "Import failed", variant: "destructive" }),
+      }
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -134,10 +203,16 @@ export default function AdminUsersPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Manage platform users and their roles</p>
         </div>
-        <Button onClick={() => setShowCreate(true)} data-testid="button-new-user">
-          <Plus className="h-4 w-4 mr-1.5" />
-          Invite User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setShowImport(true); setCsvText(""); setImportPreview([]); setImportError(""); }} data-testid="button-import-users">
+            <Upload className="h-4 w-4 mr-1.5" />
+            Import CSV
+          </Button>
+          <Button onClick={() => setShowCreate(true)} data-testid="button-new-user">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Invite User
+          </Button>
+        </div>
       </div>
 
       <div className="relative max-w-sm">
@@ -328,6 +403,92 @@ export default function AdminUsersPage() {
               <Button type="submit" disabled={updateUser.isPending} data-testid="button-update-user">Save Changes</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import CSV dialog */}
+      <Dialog open={showImport} onOpenChange={(o) => { if (!o) setShowImport(false); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Import Users from CSV</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted/40 rounded-lg border border-border text-xs text-muted-foreground">
+              <p className="font-medium text-foreground mb-1 flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Expected CSV format
+              </p>
+              <code>email,firstName,lastName,role,password</code>
+              <p className="mt-1">Role must be one of: admin, training_lead, manager, user (default: user)</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Upload CSV file</Label>
+              <Input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleFileUpload}
+                data-testid="input-import-csv-file"
+                className="cursor-pointer"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Or paste CSV text</Label>
+              <textarea
+                value={csvText}
+                onChange={(e) => handleCsvChange(e.target.value)}
+                placeholder={"email,firstName,lastName,role\njohn@example.com,John,Doe,user"}
+                data-testid="input-import-csv-text"
+                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
+              />
+            </div>
+            {importError && (
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-xs border border-destructive/20">
+                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                {importError}
+              </div>
+            )}
+            {importPreview.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Preview — {importPreview.length} row{importPreview.length !== 1 ? "s" : ""} to import
+                </p>
+                <div className="max-h-40 overflow-y-auto bg-card border border-border rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/40">
+                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Email</th>
+                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Name</th>
+                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {importPreview.slice(0, 10).map((r, i) => (
+                        <tr key={i} className="hover:bg-muted/30">
+                          <td className="px-3 py-1.5">{r.email}</td>
+                          <td className="px-3 py-1.5">{[r.firstName, r.lastName].filter(Boolean).join(" ") || "—"}</td>
+                          <td className="px-3 py-1.5">{r.role ?? "user"}</td>
+                        </tr>
+                      ))}
+                      {importPreview.length > 10 && (
+                        <tr>
+                          <td colSpan={3} className="px-3 py-1.5 text-muted-foreground text-center">
+                            …and {importPreview.length - 10} more
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowImport(false)}>Cancel</Button>
+              <Button
+                onClick={onImportSubmit}
+                disabled={importPreview.length === 0 || importUsers.isPending}
+                data-testid="button-confirm-import"
+              >
+                {importUsers.isPending ? "Importing..." : `Import ${importPreview.length > 0 ? importPreview.length + " " : ""}User${importPreview.length !== 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

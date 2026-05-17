@@ -102,27 +102,37 @@ export default function DashboardPage() {
         ) : trainings.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No trainings available</p>
         ) : (
-          <div className="space-y-1.5">
-            {trainings.map((t) => {
-              const status = getTrainingStatus(t.id);
+          <div className="space-y-4">
+            {(["not_started", "completed"] as StatusGroup[]).map((bucket) => {
+              const items = trainings.filter((t) => getTrainingStatus(t.id) === bucket);
+              if (items.length === 0) return null;
               return (
-                <Link key={t.id} href={`/trainings/${t.id}`}>
-                  <a
-                    data-testid={`card-training-${t.id}`}
-                    className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 hover:border-primary/50 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
-                      {t.estimatedDurationMinutes && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Clock className="h-3 w-3" />
-                          {t.estimatedDurationMinutes} min
-                        </p>
-                      )}
-                    </div>
-                    <StatusBadge status={status} />
-                  </a>
-                </Link>
+                <div key={bucket}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                    {bucket === "not_started" ? "Not Started" : "Completed"} ({items.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {items.map((t) => (
+                      <Link key={t.id} href={`/trainings/${t.id}`}>
+                        <a
+                          data-testid={`card-training-${t.id}`}
+                          className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 hover:border-primary/50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
+                            {t.estimatedDurationMinutes && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="h-3 w-3" />
+                                {t.estimatedDurationMinutes} min
+                              </p>
+                            )}
+                          </div>
+                          <StatusBadge status={getTrainingStatus(t.id)} />
+                        </a>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -140,25 +150,41 @@ export default function DashboardPage() {
         ) : events.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No events available</p>
         ) : (
-          <div className="space-y-1.5">
-            {events.map((e) => {
-              const status = getEventStatus(e.id, e.startAt);
+          <div className="space-y-4">
+            {(["overdue", "upcoming", "not_started", "completed"] as StatusGroup[]).map((bucket) => {
+              const items = events.filter((e) => getEventStatus(e.id, e.startAt) === bucket);
+              if (items.length === 0) return null;
+              const bucketLabel: Record<StatusGroup, string> = {
+                overdue: "Overdue",
+                upcoming: "Due Soon",
+                not_started: "Upcoming",
+                completed: "Completed",
+              };
               return (
-                <Link key={e.id} href={`/events/${e.id}`}>
-                  <a
-                    data-testid={`card-event-${e.id}`}
-                    className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 hover:border-primary/50 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{e.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(e.startAt), "MMM d, yyyy 'at' h:mm a")}
-                        {e.location && ` · ${e.location}`}
-                      </p>
-                    </div>
-                    <StatusBadge status={status} />
-                  </a>
-                </Link>
+                <div key={bucket}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                    {bucketLabel[bucket]} ({items.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {items.map((e) => (
+                      <Link key={e.id} href={`/events/${e.id}`}>
+                        <a
+                          data-testid={`card-event-${e.id}`}
+                          className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 hover:border-primary/50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{e.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {format(new Date(e.startAt), "MMM d, yyyy 'at' h:mm a")}
+                              {e.location && ` · ${e.location}`}
+                            </p>
+                          </div>
+                          <StatusBadge status={getEventStatus(e.id, e.startAt)} />
+                        </a>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               );
             })}
           </div>

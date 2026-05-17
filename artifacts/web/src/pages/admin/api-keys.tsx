@@ -56,7 +56,7 @@ export default function AdminApiKeysPage() {
   const createKey = useCreateApiKey();
   const revokeKey = useRevokeApiKey();
 
-  const keys = data?.apiKeys ?? [];
+  const keys = data?.keys ?? [];
 
   const form = useForm<KeyForm>({
     resolver: zodResolver(schema),

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Shield, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
 type Provider = "saml" | "google" | "microsoft";
 
@@ -41,6 +41,12 @@ const PROVIDER_FIELDS: Record<Provider, { key: string; label: string; type?: str
   ],
 };
 
+const PROVIDER_TEST_PATHS: Record<Provider, string> = {
+  saml: "/api/auth/saml/login",
+  google: "/api/auth/google",
+  microsoft: "/api/auth/microsoft",
+};
+
 function ProviderCard({ provider }: { provider: Provider }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -60,7 +66,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
     }
   }, [data]);
 
-  function handleSave() {
+  function handleSave(andTest = false) {
     updateProvider.mutate(
       { provider, data: { enabled, config } },
       {
@@ -68,6 +74,9 @@ function ProviderCard({ provider }: { provider: Provider }) {
           toast({ title: `${PROVIDER_LABELS[provider]} settings saved` });
           queryClient.invalidateQueries({ queryKey: getListAuthProvidersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetAuthProviderQueryKey(provider) });
+          if (andTest) {
+            window.open(PROVIDER_TEST_PATHS[provider], "_blank");
+          }
         },
         onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
       }
@@ -116,9 +125,18 @@ function ProviderCard({ provider }: { provider: Provider }) {
               />
             </div>
           ))}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Button
-              onClick={handleSave}
+              variant="outline"
+              onClick={() => handleSave(true)}
+              disabled={updateProvider.isPending}
+              data-testid={`button-save-test-provider-${provider}`}
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Save & Test
+            </Button>
+            <Button
+              onClick={() => handleSave(false)}
               disabled={updateProvider.isPending}
               data-testid={`button-save-provider-${provider}`}
             >

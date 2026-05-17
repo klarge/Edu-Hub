@@ -377,10 +377,8 @@ function ContentEditor({ trainingId }: { trainingId: string }) {
   function handleScormUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("scorm", file);
     uploadScorm.mutate(
-      { id: trainingId, data: fd },
+      { id: trainingId, data: { file } },
       {
         onSuccess: () => { toast({ title: "SCORM uploaded" }); invalidate(); },
         onError: () => toast({ title: "Upload failed", variant: "destructive" }),
@@ -392,10 +390,8 @@ function ContentEditor({ trainingId }: { trainingId: string }) {
   function handlePptxUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("pptx", file);
     uploadPptx.mutate(
-      { id: trainingId, data: fd },
+      { id: trainingId, data: { file } },
       {
         onSuccess: () => { toast({ title: "PPTX uploaded" }); invalidate(); },
         onError: () => toast({ title: "Upload failed", variant: "destructive" }),

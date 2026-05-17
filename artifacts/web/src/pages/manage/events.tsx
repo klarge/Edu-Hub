@@ -76,6 +76,9 @@ function EventRosterTab({ eventId }: { eventId: string }) {
 
   const event = data?.event;
   const registrations: EventRegistration[] = data?.registrations ?? [];
+  const attendedSet = new Set<string>(
+    (data?.attendance ?? []).map((a) => (a as { userId?: string }).userId ?? "").filter(Boolean)
+  );
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
@@ -169,8 +172,8 @@ function EventRosterTab({ eventId }: { eventId: string }) {
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">Attended</span>
                   <Switch
-                    checked={false}
-                    onCheckedChange={() => handleToggleAttendance(r.userId, false)}
+                    checked={attendedSet.has(r.userId)}
+                    onCheckedChange={() => handleToggleAttendance(r.userId, attendedSet.has(r.userId))}
                     data-testid={`switch-attendance-${r.userId}`}
                   />
                 </div>
