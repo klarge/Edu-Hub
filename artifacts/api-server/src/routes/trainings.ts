@@ -6,14 +6,20 @@ import {
   trainingContentTable,
   trainingGroupAssignmentsTable,
   userTagGroupsTable,
-  completionRecordsTable,
+  contentViewsTable,
 } from "@workspace/db/schema";
 import { authenticate } from "../middlewares/auth.js";
 import { requireMinRole, requireRole } from "../middlewares/requireRole.js";
+import { canAccessTraining } from "../lib/trainingAccess.js";
+import { maybeCompleteTraining } from "../lib/completionHelper.js";
 import type { Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { execFile } from "child_process";
+import { promisify } from "util";
+
+const execFileAsync = promisify(execFile);
 
 const UPLOAD_DIR = process.env["UPLOAD_DIR"] ?? "/tmp/training-uploads";
 
@@ -27,7 +33,7 @@ const scormStorage = multer.diskStorage({
     ensureDir(dir);
     cb(null, dir);
   },
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}.zip`),
 });
 
 const pptxStorage = multer.diskStorage({
@@ -36,7 +42,7 @@ const pptxStorage = multer.diskStorage({
     ensureDir(dir);
     cb(null, dir);
   },
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}.pptx`),
 });
 
 const uploadScorm = multer({
@@ -73,7 +79,6 @@ router.get("/trainings", authenticate, async (req: Request, res: Response) => {
   let trainingIds: string[] | null = null;
 
   if (req.user!.role === "user" || req.user!.role === "manager") {
-    // Only show trainings assigned to groups the user belongs to
     const userGroups = await db
       .select({ tagGroupId: userTagGroupsTable.tagGroupId })
       .from(userTagGroupsTable)
@@ -148,6 +153,13 @@ router.post(
 // GET /trainings/:id
 router.get("/trainings/:id", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
+
+  const allowed = await canAccessTraining(req.user!.id, req.user!.role, id);
+  if (!allowed) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const [training] = await db
     .select()
     .from(trainingsTable)
@@ -282,16 +294,19 @@ router.post(
     const scormDir = path.join(UPLOAD_DIR, "scorm", contentId);
     ensureDir(scormDir);
 
-    // Extract zip using built-in unzip
-    const { execSync } = await import("child_process");
     try {
-      execSync(`unzip -o "${req.file.path}" -d "${scormDir}"`, { stdio: "pipe" });
+      // Use execFile (not exec/execSync) so arguments are passed as an array
+      // with no shell interpolation — no injection possible.
+      await execFileAsync("unzip", ["-o", req.file.path, "-d", scormDir]);
       fs.unlinkSync(req.file.path);
-    } catch (err) {
+    } catch {
       fs.rmSync(scormDir, { recursive: true, force: true });
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
       res.status(400).json({ error: "Failed to extract SCORM package" });
       return;
     }
+
+    const originalTitle = req.file.originalname.replace(/\.zip$/i, "");
 
     const [content] = await db
       .insert(trainingContentTable)
@@ -299,7 +314,7 @@ router.post(
         id: contentId,
         trainingId: id,
         type: "scorm",
-        title: req.file.originalname.replace(/\.zip$/i, ""),
+        title: originalTitle,
         filePath: scormDir,
         url: `/api/uploads/scorm/${contentId}/`,
       })
@@ -355,7 +370,6 @@ router.delete(
       return;
     }
 
-    // Clean up files
     if (content.filePath) {
       try {
         const stat = fs.statSync(content.filePath);
@@ -364,24 +378,85 @@ router.delete(
         } else {
           fs.unlinkSync(content.filePath);
         }
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
 
     res.json({ success: true });
   },
 );
 
+// ─── Content Progress Tracking ────────────────────────────────────────────────
+
+// POST /trainings/:id/content/:contentId/viewed — user marks a content item as viewed
+router.post(
+  "/trainings/:id/content/:contentId/viewed",
+  authenticate,
+  async (req: Request, res: Response) => {
+    const { id, contentId } = req.params as { id: string; contentId: string };
+
+    const allowed = await canAccessTraining(req.user!.id, req.user!.role, id);
+    if (!allowed) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+
+    // Verify the content item belongs to this training
+    const [contentItem] = await db
+      .select()
+      .from(trainingContentTable)
+      .where(
+        and(
+          eq(trainingContentTable.id, contentId),
+          eq(trainingContentTable.trainingId, id),
+        ),
+      );
+
+    if (!contentItem) {
+      res.status(404).json({ error: "Content item not found" });
+      return;
+    }
+
+    // Idempotent — don't duplicate
+    const [existing] = await db
+      .select()
+      .from(contentViewsTable)
+      .where(
+        and(
+          eq(contentViewsTable.userId, req.user!.id),
+          eq(contentViewsTable.contentId, contentId),
+        ),
+      );
+
+    if (!existing) {
+      await db.insert(contentViewsTable).values({
+        userId: req.user!.id,
+        contentId,
+        trainingId: id,
+      });
+    }
+
+    const completed = await maybeCompleteTraining(req.user!.id, id);
+    res.json({ success: true, trainingCompleted: completed });
+  },
+);
+
 // ─── SCORM Progress ───────────────────────────────────────────────────────────
 
 // POST /trainings/:id/scorm-complete
+// SCORM packages call this to report completion.
+// This counts as both content-viewed and triggers completion check.
 router.post(
   "/trainings/:id/scorm-complete",
   authenticate,
   async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
-    const { score } = req.body as { score?: number };
+    const { score, contentId } = req.body as { score?: number; contentId?: string };
+
+    const allowed = await canAccessTraining(req.user!.id, req.user!.role, id);
+    if (!allowed) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
 
     const [training] = await db
       .select()
@@ -393,41 +468,61 @@ router.post(
       return;
     }
 
-    // Upsert completion record
-    const existing = await db
+    // Mark the SCORM content item as viewed if contentId supplied,
+    // otherwise mark ALL scorm items for this training as viewed.
+    const scormItems = await db
       .select()
-      .from(completionRecordsTable)
+      .from(trainingContentTable)
       .where(
         and(
-          eq(completionRecordsTable.userId, req.user!.id),
-          eq(completionRecordsTable.trainingId, id),
+          eq(trainingContentTable.trainingId, id),
+          contentId
+            ? eq(trainingContentTable.id, contentId)
+            : eq(trainingContentTable.type, "scorm"),
         ),
       );
 
-    if (existing.length === 0) {
-      await db.insert(completionRecordsTable).values({
-        userId: req.user!.id,
-        trainingId: id,
-        durationMinutes: training.estimatedDurationMinutes,
-        score: score ?? null,
-      });
+    for (const item of scormItems) {
+      const [existingView] = await db
+        .select()
+        .from(contentViewsTable)
+        .where(
+          and(
+            eq(contentViewsTable.userId, req.user!.id),
+            eq(contentViewsTable.contentId, item.id),
+          ),
+        );
+
+      if (!existingView) {
+        await db.insert(contentViewsTable).values({
+          userId: req.user!.id,
+          contentId: item.id,
+          trainingId: id,
+        });
+      }
     }
 
-    res.json({ success: true });
+    const completed = await maybeCompleteTraining(req.user!.id, id);
+    res.json({ success: true, trainingCompleted: completed });
   },
 );
 
 // ─── Group Assignments ────────────────────────────────────────────────────────
 
 // GET /trainings/:id/assignments
-router.get("/trainings/:id/assignments", authenticate, requireMinRole("training_lead"), async (req: Request, res: Response) => {
-  const { id } = req.params as { id: string };
-  const assignments = await db
-    .select()
-    .from(trainingGroupAssignmentsTable)
-    .where(eq(trainingGroupAssignmentsTable.trainingId, id));
-  res.json({ assignments });
-});
+router.get(
+  "/trainings/:id/assignments",
+  authenticate,
+  requireMinRole("training_lead"),
+  async (req: Request, res: Response) => {
+    const { id } = req.params as { id: string };
+    const assignments = await db
+      .select()
+      .from(trainingGroupAssignmentsTable)
+      .where(eq(trainingGroupAssignmentsTable.trainingId, id));
+    res.json({ assignments });
+  },
+);
 
 // POST /trainings/:id/assignments
 router.post(

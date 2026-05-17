@@ -43,5 +43,20 @@ export const trainingContentTable = pgTable("training_content", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const contentViewsTable = pgTable("content_views", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  contentId: uuid("content_id")
+    .notNull()
+    .references(() => trainingContentTable.id, { onDelete: "cascade" }),
+  trainingId: uuid("training_id")
+    .notNull()
+    .references(() => trainingsTable.id, { onDelete: "cascade" }),
+  viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Training = typeof trainingsTable.$inferSelect;
 export type TrainingContent = typeof trainingContentTable.$inferSelect;
+export type ContentView = typeof contentViewsTable.$inferSelect;

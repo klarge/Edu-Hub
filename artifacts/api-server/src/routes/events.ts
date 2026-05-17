@@ -11,6 +11,7 @@ import {
 } from "@workspace/db/schema";
 import { authenticate } from "../middlewares/auth.js";
 import { requireMinRole, requireRole } from "../middlewares/requireRole.js";
+import { canAccessEvent } from "../lib/trainingAccess.js";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -70,7 +71,9 @@ router.get("/events", authenticate, async (req: Request, res: Response) => {
 
   // Strip attendance codes from response for non-leads
   const isLead = req.user!.role === "training_lead" || req.user!.role === "admin";
-  const sanitized = isLead ? events : events.map(({ attendanceCode: _c, attendanceCodeExpiresAt: _e, ...e }) => e);
+  const sanitized = isLead
+    ? events
+    : events.map(({ attendanceCode: _c, attendanceCodeExpiresAt: _e, ...e }) => e);
 
   res.json({
     events: sanitized,
@@ -86,16 +89,23 @@ router.post(
   authenticate,
   requireMinRole("training_lead"),
   async (req: Request, res: Response) => {
-    const { title, description, location, startAt, endAt, estimatedDurationMinutes, maxCapacity } =
-      req.body as {
-        title?: string;
-        description?: string;
-        location?: string;
-        startAt?: string;
-        endAt?: string;
-        estimatedDurationMinutes?: number;
-        maxCapacity?: number;
-      };
+    const {
+      title,
+      description,
+      location,
+      startAt,
+      endAt,
+      estimatedDurationMinutes,
+      maxCapacity,
+    } = req.body as {
+      title?: string;
+      description?: string;
+      location?: string;
+      startAt?: string;
+      endAt?: string;
+      estimatedDurationMinutes?: number;
+      maxCapacity?: number;
+    };
 
     if (!title || !startAt || !endAt) {
       res.status(400).json({ error: "title, startAt, and endAt are required" });
@@ -123,6 +133,13 @@ router.post(
 // GET /events/:id
 router.get("/events/:id", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
+
+  const allowed = await canAccessEvent(req.user!.id, req.user!.role, id);
+  if (!allowed) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const [event] = await db
     .select()
     .from(eventsTable)
@@ -157,17 +174,25 @@ router.put(
   requireMinRole("training_lead"),
   async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
-    const { title, description, location, startAt, endAt, estimatedDurationMinutes, maxCapacity, isActive } =
-      req.body as {
-        title?: string;
-        description?: string;
-        location?: string;
-        startAt?: string;
-        endAt?: string;
-        estimatedDurationMinutes?: number;
-        maxCapacity?: number;
-        isActive?: boolean;
-      };
+    const {
+      title,
+      description,
+      location,
+      startAt,
+      endAt,
+      estimatedDurationMinutes,
+      maxCapacity,
+      isActive,
+    } = req.body as {
+      title?: string;
+      description?: string;
+      location?: string;
+      startAt?: string;
+      endAt?: string;
+      estimatedDurationMinutes?: number;
+      maxCapacity?: number;
+      isActive?: boolean;
+    };
 
     const updates: Partial<typeof eventsTable.$inferInsert> = {};
     if (title !== undefined) updates.title = title;
@@ -175,7 +200,8 @@ router.put(
     if (location !== undefined) updates.location = location;
     if (startAt !== undefined) updates.startAt = new Date(startAt);
     if (endAt !== undefined) updates.endAt = new Date(endAt);
-    if (estimatedDurationMinutes !== undefined) updates.estimatedDurationMinutes = estimatedDurationMinutes;
+    if (estimatedDurationMinutes !== undefined)
+      updates.estimatedDurationMinutes = estimatedDurationMinutes;
     if (maxCapacity !== undefined) updates.maxCapacity = maxCapacity;
     if (isActive !== undefined) updates.isActive = isActive;
     updates.updatedAt = new Date();
@@ -223,6 +249,12 @@ router.post(
   authenticate,
   async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
+
+    const allowed = await canAccessEvent(req.user!.id, req.user!.role, id);
+    if (!allowed) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
 
     const [event] = await db
       .select()
@@ -344,19 +376,27 @@ router.post(
     const { id } = req.params as { id: string };
     const { expiresInMinutes = 60 } = req.body as { expiresInMinutes?: number };
 
-    const code = generateAttendanceCode();
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
-
     const [event] = await db
-      .update(eventsTable)
-      .set({ attendanceCode: code, attendanceCodeExpiresAt: expiresAt, updatedAt: new Date() })
-      .where(eq(eventsTable.id, id))
-      .returning();
+      .select()
+      .from(eventsTable)
+      .where(eq(eventsTable.id, id));
 
     if (!event) {
       res.status(404).json({ error: "Event not found" });
       return;
     }
+
+    // Cap expiry at event end time so codes don't outlive the event
+    const requestedExpiry = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    const expiresAt =
+      requestedExpiry > event.endAt ? event.endAt : requestedExpiry;
+
+    const code = generateAttendanceCode();
+
+    await db
+      .update(eventsTable)
+      .set({ attendanceCode: code, attendanceCodeExpiresAt: expiresAt, updatedAt: new Date() })
+      .where(eq(eventsTable.id, id));
 
     res.json({ code, expiresAt });
   },
@@ -434,11 +474,23 @@ router.post(
     });
 
     // Create completion record
-    await db.insert(completionRecordsTable).values({
-      userId: req.user!.id,
-      eventId: id,
-      durationMinutes: event.estimatedDurationMinutes,
-    });
+    const completionExists = await db
+      .select()
+      .from(completionRecordsTable)
+      .where(
+        and(
+          eq(completionRecordsTable.eventId, id),
+          eq(completionRecordsTable.userId, req.user!.id),
+        ),
+      );
+
+    if (completionExists.length === 0) {
+      await db.insert(completionRecordsTable).values({
+        userId: req.user!.id,
+        eventId: id,
+        durationMinutes: event.estimatedDurationMinutes,
+      });
+    }
 
     res.json({ success: true });
   },
@@ -451,7 +503,23 @@ router.post(
   requireMinRole("training_lead"),
   async (req: Request, res: Response) => {
     const { id, userId } = req.params as { id: string; userId: string };
-    const { attended } = req.body as { attended?: boolean };
+    const { attended = true } = req.body as { attended?: boolean };
+
+    // Verify target user is a registrant
+    const [reg] = await db
+      .select()
+      .from(eventRegistrationsTable)
+      .where(
+        and(
+          eq(eventRegistrationsTable.eventId, id),
+          eq(eventRegistrationsTable.userId, userId),
+        ),
+      );
+
+    if (!reg) {
+      res.status(404).json({ error: "User is not registered for this event" });
+      return;
+    }
 
     if (attended === false) {
       // Remove attendance
@@ -495,7 +563,11 @@ router.post(
         markedBy: req.user!.id,
       });
 
-      const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, id));
+      const [event] = await db
+        .select()
+        .from(eventsTable)
+        .where(eq(eventsTable.id, id));
+
       const completionExists = await db
         .select()
         .from(completionRecordsTable)
@@ -532,7 +604,10 @@ router.post(
       .from(eventRegistrationsTable)
       .where(eq(eventRegistrationsTable.eventId, id));
 
-    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, id));
+    const [event] = await db
+      .select()
+      .from(eventsTable)
+      .where(eq(eventsTable.id, id));
 
     const existingAttendance = await db
       .select()
@@ -551,11 +626,23 @@ router.post(
           markedBy: req.user!.id,
         });
 
-        await db.insert(completionRecordsTable).values({
-          userId: reg.userId,
-          eventId: id,
-          durationMinutes: event?.estimatedDurationMinutes ?? null,
-        });
+        const completionExists = await db
+          .select()
+          .from(completionRecordsTable)
+          .where(
+            and(
+              eq(completionRecordsTable.eventId, id),
+              eq(completionRecordsTable.userId, reg.userId),
+            ),
+          );
+
+        if (completionExists.length === 0) {
+          await db.insert(completionRecordsTable).values({
+            userId: reg.userId,
+            eventId: id,
+            durationMinutes: event?.estimatedDurationMinutes ?? null,
+          });
+        }
 
         marked++;
       }
@@ -568,14 +655,19 @@ router.post(
 // ─── Event Group Assignments ──────────────────────────────────────────────────
 
 // GET /events/:id/assignments
-router.get("/events/:id/assignments", authenticate, requireMinRole("training_lead"), async (req: Request, res: Response) => {
-  const { id } = req.params as { id: string };
-  const assignments = await db
-    .select()
-    .from(eventGroupAssignmentsTable)
-    .where(eq(eventGroupAssignmentsTable.eventId, id));
-  res.json({ assignments });
-});
+router.get(
+  "/events/:id/assignments",
+  authenticate,
+  requireMinRole("training_lead"),
+  async (req: Request, res: Response) => {
+    const { id } = req.params as { id: string };
+    const assignments = await db
+      .select()
+      .from(eventGroupAssignmentsTable)
+      .where(eq(eventGroupAssignmentsTable.eventId, id));
+    res.json({ assignments });
+  },
+);
 
 // POST /events/:id/assignments
 router.post(

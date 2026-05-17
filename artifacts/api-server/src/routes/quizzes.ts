@@ -6,10 +6,11 @@ import {
   quizQuestionsTable,
   quizAttemptsTable,
   trainingsTable,
-  completionRecordsTable,
 } from "@workspace/db/schema";
 import { authenticate } from "../middlewares/auth.js";
 import { requireMinRole } from "../middlewares/requireRole.js";
+import { canAccessTraining } from "../lib/trainingAccess.js";
+import { maybeCompleteTraining } from "../lib/completionHelper.js";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -19,6 +20,12 @@ const router = Router();
 // GET /trainings/:id/quiz
 router.get("/trainings/:id/quiz", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
+
+  const allowed = await canAccessTraining(req.user!.id, req.user!.role, id);
+  if (!allowed) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
 
   const [quiz] = await db
     .select()
@@ -70,13 +77,14 @@ router.post(
       return;
     }
 
-    // Only one quiz per training
     const [existing] = await db
       .select()
       .from(quizzesTable)
       .where(eq(quizzesTable.trainingId, id));
     if (existing) {
-      res.status(409).json({ error: "Training already has a quiz. Update or delete the existing one." });
+      res.status(409).json({
+        error: "Training already has a quiz. Update or delete the existing one.",
+      });
       return;
     }
 
@@ -168,8 +176,14 @@ router.post(
       res.status(400).json({ error: "question and options (min 2) are required" });
       return;
     }
-    if (correctAnswerIndex === undefined || correctAnswerIndex < 0 || correctAnswerIndex >= options.length) {
-      res.status(400).json({ error: "correctAnswerIndex must be a valid option index" });
+    if (
+      correctAnswerIndex === undefined ||
+      correctAnswerIndex < 0 ||
+      correctAnswerIndex >= options.length
+    ) {
+      res
+        .status(400)
+        .json({ error: "correctAnswerIndex must be a valid option index" });
       return;
     }
 
@@ -184,7 +198,13 @@ router.post(
 
     const [q] = await db
       .insert(quizQuestionsTable)
-      .values({ quizId: quiz.id, question, options, correctAnswerIndex, displayOrder: displayOrder ?? 0 })
+      .values({
+        quizId: quiz.id,
+        question,
+        options,
+        correctAnswerIndex,
+        displayOrder: displayOrder ?? 0,
+      })
       .returning();
 
     res.status(201).json({ question: q });
@@ -208,7 +228,8 @@ router.put(
     const updates: Partial<typeof quizQuestionsTable.$inferInsert> = {};
     if (question !== undefined) updates.question = question;
     if (options !== undefined) updates.options = options;
-    if (correctAnswerIndex !== undefined) updates.correctAnswerIndex = correctAnswerIndex;
+    if (correctAnswerIndex !== undefined)
+      updates.correctAnswerIndex = correctAnswerIndex;
     if (displayOrder !== undefined) updates.displayOrder = displayOrder;
 
     const [q] = await db
@@ -232,7 +253,9 @@ router.delete(
   requireMinRole("training_lead"),
   async (req: Request, res: Response) => {
     const { questionId } = req.params as { questionId: string };
-    await db.delete(quizQuestionsTable).where(eq(quizQuestionsTable.id, questionId));
+    await db
+      .delete(quizQuestionsTable)
+      .where(eq(quizQuestionsTable.id, questionId));
     res.json({ success: true });
   },
 );
@@ -249,6 +272,12 @@ router.post(
 
     if (!answers || !Array.isArray(answers)) {
       res.status(400).json({ error: "answers array is required" });
+      return;
+    }
+
+    const allowed = await canAccessTraining(req.user!.id, req.user!.role, id);
+    if (!allowed) {
+      res.status(403).json({ error: "Access denied" });
       return;
     }
 
@@ -278,7 +307,10 @@ router.post(
       if (answers[i] === questions[i]!.correctAnswerIndex) correct++;
     }
 
-    const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
+    const score =
+      questions.length > 0
+        ? Math.round((correct / questions.length) * 100)
+        : 0;
     const passed = score >= quiz.passingScore;
 
     const [attempt] = await db
@@ -292,34 +324,19 @@ router.post(
       })
       .returning();
 
-    // If passed, create/update completion record
+    // Trigger unified completion check — completes only if content is also viewed
+    let trainingCompleted = false;
     if (passed) {
-      const [training] = await db
-        .select()
-        .from(trainingsTable)
-        .where(eq(trainingsTable.id, id));
-
-      const existing = await db
-        .select()
-        .from(completionRecordsTable)
-        .where(
-          and(
-            eq(completionRecordsTable.userId, req.user!.id),
-            eq(completionRecordsTable.trainingId, id),
-          ),
-        );
-
-      if (existing.length === 0) {
-        await db.insert(completionRecordsTable).values({
-          userId: req.user!.id,
-          trainingId: id,
-          durationMinutes: training?.estimatedDurationMinutes ?? null,
-          score,
-        });
-      }
+      trainingCompleted = await maybeCompleteTraining(req.user!.id, id);
     }
 
-    res.json({ attempt, score, passed, passingScore: quiz.passingScore });
+    res.json({
+      attempt,
+      score,
+      passed,
+      passingScore: quiz.passingScore,
+      trainingCompleted,
+    });
   },
 );
 
@@ -329,6 +346,12 @@ router.get(
   authenticate,
   async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
+
+    const allowed = await canAccessTraining(req.user!.id, req.user!.role, id);
+    if (!allowed) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
 
     const [quiz] = await db
       .select()
