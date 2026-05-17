@@ -18,9 +18,13 @@ async function dispatchDueDateReminders() {
 
     const days = cfg.reminderDaysBefore;
     const now = new Date();
-    const windowEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    // Send exactly one reminder per assignment: only when dueDate falls in the
+    // 24-hour window that starts exactly `days` days from now (midnight-to-midnight).
+    // This prevents repeated daily emails for the same assignment.
+    const windowStart = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const windowEnd   = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // Find all assignments whose dueDate falls within [now, now + reminderDays]
+    // Find all assignments whose dueDate falls within [now+days, now+days+1day)
     const assignments = await db
       .select({
         trainingId: trainingGroupAssignmentsTable.trainingId,
@@ -31,7 +35,7 @@ async function dispatchDueDateReminders() {
       .where(
         and(
           isNotNull(trainingGroupAssignmentsTable.dueDate),
-          gte(trainingGroupAssignmentsTable.dueDate, now),
+          gte(trainingGroupAssignmentsTable.dueDate, windowStart),
           lte(trainingGroupAssignmentsTable.dueDate, windowEnd),
         ),
       );

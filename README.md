@@ -75,8 +75,10 @@ echo "GITHUB_REPOSITORY=your-org/trainhub" >> .env
 echo "IMAGE_TAG=v1.0.0" >> .env
 
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
 ```
+
+> `--no-build` prevents Compose from falling back to a local build when the pulled image is present. Requires Docker Compose v2.x (ships with Docker Desktop and Docker Engine 20.10+).
 
 ---
 

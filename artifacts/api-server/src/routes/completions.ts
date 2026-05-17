@@ -181,14 +181,30 @@ router.get(
     const appName = settings["app_name"] || "TrainHub";
     const appLogoUrl = settings["app_logo_url"] ?? "";
 
-    // Optionally fetch logo as buffer (graceful fallback on failure)
+    // Optionally fetch logo as buffer (graceful fallback on failure).
+    // SSRF guard: reject URLs that resolve to loopback or RFC-1918 private addresses.
     let logoBuffer: Buffer | null = null;
     if (appLogoUrl) {
       try {
-        const resp = await fetch(appLogoUrl, { signal: AbortSignal.timeout(5000) });
-        if (resp.ok) logoBuffer = Buffer.from(await resp.arrayBuffer());
+        const parsed = new URL(appLogoUrl);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+          const { promises: dns } = await import("dns");
+          const { address } = await dns.lookup(parsed.hostname);
+          const isPrivate =
+            /^127\./.test(address) ||
+            /^10\./.test(address) ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(address) ||
+            /^192\.168\./.test(address) ||
+            address === "::1" ||
+            /^fd/.test(address) ||
+            /^fe80:/.test(address);
+          if (!isPrivate) {
+            const resp = await fetch(appLogoUrl, { signal: AbortSignal.timeout(5000) });
+            if (resp.ok) logoBuffer = Buffer.from(await resp.arrayBuffer());
+          }
+        }
       } catch {
-        // silently skip logo if unreachable
+        // silently skip logo if unreachable or DNS fails
       }
     }
 

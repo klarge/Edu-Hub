@@ -1,11 +1,15 @@
 # Production override — pulls pre-built images from GHCR instead of building locally.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+#
+# --no-build prevents Compose from falling back to a local build when an image is present.
+# Requires Docker Compose v2.x (ships with Docker Desktop and Docker Engine 20.10+).
 
 services:
   api:
-    build: !reset null
     image: ghcr.io/${GITHUB_REPOSITORY:-your-org/trainhub}/api-server:${IMAGE_TAG:-latest}
 
   web:
-    build: !reset null
     image: ghcr.io/${GITHUB_REPOSITORY:-your-org/trainhub}/web:${IMAGE_TAG:-latest}
