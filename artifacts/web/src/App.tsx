@@ -19,6 +19,7 @@ import AdminAssignmentsPage from "@/pages/admin/assignments";
 import AdminSSOPage from "@/pages/admin/sso";
 import AdminSMTPPage from "@/pages/admin/smtp";
 import AdminApiKeysPage from "@/pages/admin/api-keys";
+import SetupPage from "@/pages/setup";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, staleTime: 30000 } },
@@ -42,6 +43,7 @@ function RequireRole({ roles, children }: { roles: Role[]; children: React.React
 function Router() {
   return (
     <Switch>
+      <Route path="/setup" component={SetupPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/">
         <AuthenticatedRoute><DashboardPage /></AuthenticatedRoute>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,16 @@ export default function LoginPage() {
   const { toast } = useToast();
   const login = useLogin();
   const { data: publicSettings } = useGetPublicSettings();
+
+  // Redirect to setup wizard on first run
+  useEffect(() => {
+    fetch("/api/setup/status", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { needsSetup?: boolean }) => {
+        if (data.needsSetup) setLocation("/setup");
+      })
+      .catch(() => {});
+  }, [setLocation]);
 
   const settings = publicSettings?.settings ?? {};
   const samlEnabled = settings["saml_enabled"] === "true";
