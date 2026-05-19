@@ -16,7 +16,7 @@ COPY lib/api-zod/            ./lib/api-zod/
 COPY artifacts/api-server/   ./artifacts/api-server/
 
 # Install all workspace dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Build the API server bundle
 RUN pnpm --filter @workspace/api-server run build

@@ -16,7 +16,7 @@ COPY lib/api-client-react/ ./lib/api-client-react/
 COPY artifacts/web/      ./artifacts/web/
 
 # Install and build
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 RUN pnpm --filter @workspace/web run build
 
 ### Stage 2: nginx ──────────────────────────────────────────────────────────────
