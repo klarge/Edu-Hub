@@ -15,7 +15,7 @@ COPY lib/db/                 ./lib/db/
 COPY lib/api-zod/            ./lib/api-zod/
 COPY artifacts/api-server/   ./artifacts/api-server/
 
-# Install all workspace dependencies
+# Install all workspace dependencies (drizzle-kit is a root devDep, available here)
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Build the API server bundle
@@ -33,22 +33,19 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=builder /workspace/artifacts/api-server/dist ./dist
 
 # Copy externalized runtime dependencies from the workspace node_modules
-# (nodemailer, pdfkit, node-cron, pino transports, drizzle-kit, etc.)
+# (nodemailer, pdfkit, node-cron, pino transports, etc. are externalized in build.mjs)
 COPY --from=builder /workspace/node_modules ./node_modules
 
-# Copy the db schema so drizzle-kit push can run on startup
-COPY --from=builder /workspace/lib/db ./lib/db
+# Copy the pre-generated SQL migration files — applied at startup via migrate()
+COPY --from=builder /workspace/lib/db/migrations ./migrations
 
 # Pino needs its worker files relative to the binary path
 COPY --from=builder /workspace/artifacts/api-server/package.json ./package.json
 
-# Startup entrypoint: pushes schema then starts the server
-COPY artifacts/api-server/entrypoint.sh ./entrypoint.sh
-
-RUN chmod +x ./entrypoint.sh && chown -R appuser:appgroup /app
+RUN chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 8080
 
-CMD ["./entrypoint.sh"]
+CMD ["node", "--enable-source-maps", "./dist/index.mjs"]

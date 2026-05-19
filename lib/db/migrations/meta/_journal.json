@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1779198267984,
+      "tag": "0000_material_supreme_intelligence",
+      "breakpoints": true
+    }
+  ]
+}
