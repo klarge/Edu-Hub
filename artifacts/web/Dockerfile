@@ -1,5 +1,5 @@
 ### Stage 1: build ─────────────────────────────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM node:24 AS builder
 
 WORKDIR /workspace
 

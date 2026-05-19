@@ -1,0 +1,54 @@
+#20 [builder 11/11] RUN pnpm --filter @workspace/web run build
+#20 1.564 $ vite build --config vite.config.ts
+#20 1.794 /workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:115
+#20 1.794 		throw new Error(
+#20 1.794 		      ^
+#20 1.794 
+#20 1.794 Error: Cannot find module @rollup/rollup-linux-x64-musl. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+#20 1.794     at requireWithFriendlyError (/workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:115:9)
+#20 1.794     at Object.<anonymous> (/workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:124:76)
+#20 1.794     at Module._compile (node:internal/modules/cjs/loader:1830:14)
+#20 1.794     at Object..js (node:internal/modules/cjs/loader:1961:10)
+#20 1.794     at Module.load (node:internal/modules/cjs/loader:1553:32)
+#20 1.794     at Module._load (node:internal/modules/cjs/loader:1355:12)
+#20 1.794     at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+#20 1.794     at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:326:3)
+#20 1.794     at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:231:7)
+#20 1.794     at ModuleJob.run (node:internal/modules/esm/module_job:437:25) {
+#20 1.794   [cause]: Error: Cannot find module '@rollup/rollup-linux-x64-musl'
+#20 1.794   Require stack:
+#20 1.794   - /workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js
+#20 1.794       at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)
+#20 1.794       at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)
+#20 1.794       at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)
+#20 1.794       at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)
+#20 1.794       at Module._load (node:internal/modules/cjs/loader:1262:25)
+#20 1.794       at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+#20 1.794       at Module.require (node:internal/modules/cjs/loader:1576:12)
+#20 1.794       at require (node:internal/modules/helpers:153:16)
+#20 1.794       at requireWithFriendlyError (/workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:97:10)
+#20 1.794       at Object.<anonymous> (/workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:124:76) {
+#20 1.794     code: 'MODULE_NOT_FOUND',
+#20 1.794     requireStack: [
+#20 1.794       '/workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js'
+#20 1.794     ]
+#20 1.794   }
+#20 1.794 }
+#20 1.794 
+#20 1.794 Node.js v24.15.0
+#20 1.845 /workspace/artifacts/web:
+#20 1.845 [ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/web@0.0.0 build: `vite build --config vite.config.ts`
+#20 1.845 Exit status 1
+#20 ERROR: process "/bin/sh -c pnpm --filter @workspace/web run build" did not complete successfully: exit code: 1
+------
+ > [builder 11/11] RUN pnpm --filter @workspace/web run build:
+1.794     requireStack: [
+1.794       '/workspace/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js'
+1.794     ]
+1.794   }
+1.794 }
+1.794 
+1.794 Node.js v24.15.0
+1.845 /workspace/artifacts/web:
+1.845 [ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/web@0.0.0 build: `vite build --config vite.config.ts`
+1.845 Exit status 1
