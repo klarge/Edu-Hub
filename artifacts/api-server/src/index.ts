@@ -19,12 +19,14 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-// Apply any pending database migrations before accepting traffic.
-// Migration files are generated at build time and embedded in the image.
-const migrationsFolder = path.join(__dirname, "../migrations");
-logger.info({ migrationsFolder }, "Applying database migrations...");
-await migrate(db, { migrationsFolder });
-logger.info("Database migrations applied.");
+// Apply pending migrations in production only.
+// In development, the schema is managed with `drizzle-kit push` instead.
+if (process.env.NODE_ENV === "production") {
+  const migrationsFolder = path.join(__dirname, "../migrations");
+  logger.info({ migrationsFolder }, "Applying database migrations...");
+  await migrate(db, { migrationsFolder });
+  logger.info("Database migrations applied.");
+}
 
 app.listen(port, (err) => {
   if (err) {
