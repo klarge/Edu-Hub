@@ -26,13 +26,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && error) {
-      setLocation("/login");
+    if (!isLoading && error && location !== "/setup") {
+      // On a fresh install, check setup status before bouncing to login
+      fetch("/api/setup/status", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d: { needsSetup?: boolean }) => {
+          setLocation(d.needsSetup ? "/setup" : "/login");
+        })
+        .catch(() => setLocation("/login"));
     }
-  }, [isLoading, error, setLocation]);
+  }, [isLoading, error, location, setLocation]);
 
   const logout = useCallback(async () => {
     try {
