@@ -14,11 +14,12 @@ services:
       timeout: 5s
       retries: 10
 
-  # Optional: Redis for session storage. Remove this service (and REDIS_URL from api)
-  # if you prefer the default in-memory session store (not suitable for multi-instance).
+  # Redis is opt-in for persistent sessions (required for multi-instance deployments).
+  # Enable it by starting with: docker compose --profile redis up -d
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    profiles: ["redis"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -38,14 +39,12 @@ services:
       DATABASE_URL:    postgresql://${POSTGRES_USER:-trainhub}:${POSTGRES_PASSWORD:-trainhub_secret}@postgres:5432/${POSTGRES_DB:-trainhub}
       SESSION_SECRET:  ${SESSION_SECRET:?SESSION_SECRET must be set}
       UPLOAD_DIR:      /data/uploads
-      # Optional: set REDIS_URL to use Redis-backed sessions (required for multi-instance)
-      REDIS_URL:       ${REDIS_URL:-redis://redis:6379}
+      # Set REDIS_URL and start with --profile redis to enable Redis-backed sessions
+      REDIS_URL:       ${REDIS_URL:-}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   web:
