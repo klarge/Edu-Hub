@@ -3,13 +3,12 @@
 # No source code needs to be present on the server.
 #
 # Required environment variables (set in Portainer's "Env" tab or a .env file):
-#   SESSION_SECRET   — long random string, e.g. $(openssl rand -hex 32)
-#   GITHUB_REPOSITORY — org/repo where images are published, e.g. your-org/trainhub
+#   SESSION_SECRET    — long random string, e.g. $(openssl rand -hex 32)
 #
 # Optional:
-#   IMAGE_TAG        — image tag to pull (default: latest)
+#   IMAGE_TAG         — image tag to pull (default: latest)
 #   POSTGRES_PASSWORD — change for production (default: trainhub_secret)
-#   HTTP_PORT        — host port for the web UI (default: 80)
+#   HTTP_PORT         — host port for the web UI (default: 80)
 
 services:
   postgres:
@@ -28,7 +27,7 @@ services:
       retries: 10
 
   api:
-    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/trainhub}/api-server:${IMAGE_TAG:-latest}
+    image: ghcr.io/klarge/trainhub/api-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       PORT:           8080
@@ -44,7 +43,7 @@ services:
         condition: service_healthy
 
   web:
-    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/trainhub}/web:${IMAGE_TAG:-latest}
+    image: ghcr.io/klarge/trainhub/web:${IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
