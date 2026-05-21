@@ -64,7 +64,7 @@ export default function LoginPage() {
           <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
             <BookOpen className="h-5 w-5 text-white" />
           </div>
-          <span className="text-xl font-semibold tracking-tight">TrainHub</span>
+          <span className="text-xl font-semibold tracking-tight">EduHub</span>
         </div>
 
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">

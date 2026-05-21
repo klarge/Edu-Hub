@@ -7,7 +7,7 @@
 #
 # Optional:
 #   IMAGE_TAG         — image tag to pull (default: latest)
-#   POSTGRES_PASSWORD — change for production (default: trainhub_secret)
+#   POSTGRES_PASSWORD — change for production (default: eduhub_secret)
 #   HTTP_PORT         — host port for the web UI (default: 80)
 
 services:
@@ -15,13 +15,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER:     ${POSTGRES_USER:-trainhub}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trainhub_secret}
-      POSTGRES_DB:       ${POSTGRES_DB:-trainhub}
+      POSTGRES_USER:     ${POSTGRES_USER:-eduhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eduhub_secret}
+      POSTGRES_DB:       ${POSTGRES_DB:-eduhub}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trainhub} -d ${POSTGRES_DB:-trainhub}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eduhub} -d ${POSTGRES_DB:-eduhub}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -32,7 +32,7 @@ services:
     environment:
       PORT:           8080
       NODE_ENV:       production
-      DATABASE_URL:   postgresql://${POSTGRES_USER:-trainhub}:${POSTGRES_PASSWORD:-trainhub_secret}@postgres:5432/${POSTGRES_DB:-trainhub}
+      DATABASE_URL:   postgresql://${POSTGRES_USER:-eduhub}:${POSTGRES_PASSWORD:-eduhub_secret}@postgres:5432/${POSTGRES_DB:-eduhub}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
       UPLOAD_DIR:     /data/uploads
       REDIS_URL:      ${REDIS_URL:-}

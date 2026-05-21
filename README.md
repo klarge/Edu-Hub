@@ -1,4 +1,4 @@
-# TrainHub
+# EduHub
 
 A self-hostable professional training platform with role-based groups, online training (SCORM, YouTube, Google Slides / PPTX), quizzes, in-person events with attendance codes, training assignment to groups, completion certificates, and SMTP notifications.
 
@@ -13,8 +13,8 @@ A self-hostable professional training platform with role-based groups, online tr
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-org/trainhub.git
-cd trainhub
+git clone https://github.com/your-org/eduhub.git
+cd eduhub
 ```
 
 ### 2. Configure environment
@@ -49,61 +49,54 @@ The web frontend proxies all `/api/*` requests to the API server automatically.
 
 ### 4. First-run admin setup
 
-On the first start, the database is empty. To create the initial admin account:
-
-1. Open `http://localhost` and register a new account (any email and password).
-2. Promote that account to admin by running a one-time SQL command:
-
-```bash
-docker compose exec postgres psql \
-  -U ${POSTGRES_USER:-trainhub} \
-  -d ${POSTGRES_DB:-trainhub} \
-  -c "UPDATE users SET role = 'admin' WHERE email = 'you@example.com';"
-```
-
-Replace `you@example.com` with the email you registered with. You only need to do this once — all subsequent admin accounts can be promoted from **Admin → Users** in the web UI.
+On the first start, navigate to your install URL — the setup wizard will appear automatically to create your admin account and set the platform name.
 
 ---
 
 ## Production deployment (pre-built images)
 
-Use the `docker-compose.prod.yml` override to pull images from GHCR instead of building locally:
+Use `docker-compose.prod.yml` to pull images from GHCR instead of building locally. The file is self-contained and requires no source code on the server.
+
+### Portainer (recommended)
+
+1. In Portainer, go to **Stacks → Add stack**.
+2. Paste the contents of `docker-compose.prod.yml`.
+3. Under **Environment variables**, add at minimum:
+   - `SESSION_SECRET` — a long random string, e.g. `openssl rand -hex 32`
+4. Deploy the stack.
+
+### Docker Compose CLI
 
 ```bash
-# Set your repo and desired tag in .env
-echo "GITHUB_REPOSITORY=your-org/trainhub" >> .env
-echo "IMAGE_TAG=v1.0.0" >> .env
-
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
-
-> `--no-build` prevents Compose from falling back to a local build when the pulled image is present. Requires Docker Compose v2.x (ships with Docker Desktop and Docker Engine 20.10+).
 
 ---
 
 ## Updating
 
 ```bash
-docker compose pull   # fetch latest images (prod) or rebuild (dev)
-docker compose up -d  # recreate changed containers; postgres data is preserved
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
+
+Postgres data is stored in a named volume and is preserved across updates.
 
 ---
 
 ## Environment variable reference
 
-| Variable           | Required | Default                 | Description                                         |
-|--------------------|----------|-------------------------|-----------------------------------------------------|
-| `POSTGRES_USER`     | No       | `trainhub`              | PostgreSQL username                                 |
-| `POSTGRES_PASSWORD` | **Yes**  | `trainhub_secret`       | PostgreSQL password — change for production         |
-| `POSTGRES_DB`       | No       | `trainhub`              | PostgreSQL database name                            |
-| `SESSION_SECRET`    | **Yes**  | —                       | Long random string used to sign session cookies     |
-| `PORT`              | No       | `8080`                  | Port the API server listens on (inside container)   |
-| `UPLOAD_DIR`        | No       | `/data/uploads`         | Path for SCORM / PPTX upload storage                |
-| `HTTP_PORT`         | No       | `80`                    | Host port mapped to the nginx frontend              |
-| `GITHUB_REPOSITORY` | No       | `your-org/trainhub`     | Used by docker-compose.prod.yml for image pulls     |
-| `IMAGE_TAG`         | No       | `latest`                | Image tag to pull in production                     |
+| Variable            | Required | Default          | Description                                        |
+|---------------------|----------|------------------|----------------------------------------------------|
+| `POSTGRES_USER`     | No       | `eduhub`         | PostgreSQL username                                |
+| `POSTGRES_PASSWORD` | **Yes**  | `eduhub_secret`  | PostgreSQL password — change for production        |
+| `POSTGRES_DB`       | No       | `eduhub`         | PostgreSQL database name                           |
+| `SESSION_SECRET`    | **Yes**  | —                | Long random string used to sign session cookies    |
+| `PORT`              | No       | `8080`           | Port the API server listens on (inside container)  |
+| `UPLOAD_DIR`        | No       | `/data/uploads`  | Path for SCORM / PPTX upload storage               |
+| `HTTP_PORT`         | No       | `80`             | Host port mapped to the nginx frontend             |
+| `IMAGE_TAG`         | No       | `latest`         | Image tag to pull in production                    |
 
 ---
 
@@ -145,6 +138,12 @@ Push database schema changes:
 
 ```bash
 pnpm --filter @workspace/db run push
+```
+
+Generate migration files (run after schema changes, commit the output):
+
+```bash
+pnpm --filter @workspace/db run generate
 ```
 
 ---

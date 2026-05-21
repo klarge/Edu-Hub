@@ -37,7 +37,7 @@ export default function SetupPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      platformName: "TrainHub",
+      platformName: "EduHub",
       firstName: "",
       lastName: "",
       email: "",
@@ -108,7 +108,7 @@ export default function SetupPage() {
           <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
             <BookOpen className="h-5 w-5 text-white" />
           </div>
-          <span className="text-xl font-semibold tracking-tight">TrainHub</span>
+          <span className="text-xl font-semibold tracking-tight">EduHub</span>
         </div>
 
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
@@ -123,7 +123,7 @@ export default function SetupPage() {
               <Label htmlFor="platformName">Platform name</Label>
               <Input
                 id="platformName"
-                placeholder="TrainHub"
+                placeholder="EduHub"
                 data-testid="input-platform-name"
                 {...form.register("platformName")}
               />

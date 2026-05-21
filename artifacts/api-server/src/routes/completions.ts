@@ -178,7 +178,7 @@ router.get(
     const settingsRows = await db.select().from(appSettingsTable);
     const settings: Record<string, string> = {};
     for (const row of settingsRows) settings[row.key] = row.value;
-    const appName = settings["app_name"] || "TrainHub";
+    const appName = settings["app_name"] || "EduHub";
     const appLogoUrl = settings["app_logo_url"] ?? "";
 
     // Optionally fetch logo as buffer (graceful fallback on failure).

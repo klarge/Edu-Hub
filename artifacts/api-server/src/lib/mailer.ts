@@ -21,8 +21,8 @@ export async function getMailConfig(): Promise<SmtpConfig> {
     port: parseInt(s["smtp_port"] ?? "587"),
     user: s["smtp_user"] || undefined,
     pass: s["smtp_password"] || undefined,
-    from: s["smtp_from"] || s["smtp_user"] || "no-reply@trainhub.local",
-    appName: s["app_name"] || "TrainHub",
+    from: s["smtp_from"] || s["smtp_user"] || "no-reply@eduhub.local",
+    appName: s["app_name"] || "EduHub",
     reminderDaysBefore: parseInt(s["reminder_days_before"] ?? "3"),
     remindersEnabled: s["reminders_enabled"] !== "false",
   };

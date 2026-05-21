@@ -194,8 +194,8 @@ router.post("/settings/test-email", authenticate, requireRole("admin"), async (r
     await transport.sendMail({
       from,
       to,
-      subject: "TrainHub – SMTP Test",
-      text: "This is a test email from your TrainHub installation. If you received it, your SMTP settings are working correctly.",
+      subject: "EduHub – SMTP Test",
+      text: "This is a test email from your EduHub installation. If you received it, your SMTP settings are working correctly.",
     });
     res.json({ success: true });
   } catch (err) {

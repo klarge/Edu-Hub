@@ -107,7 +107,7 @@ export function AppSidebar() {
           <BookOpen className="h-4 w-4 text-white" />
         </div>
         <span className="text-sm font-semibold text-sidebar-accent-foreground tracking-tight">
-          TrainHub
+          EduHub
         </span>
       </div>
 
