@@ -22,7 +22,7 @@ RUN pnpm --filter @workspace/api-server run build
 # Produce a clean production deployment with a flat, fully-resolved node_modules.
 # This ensures externalized packages (node-cron, nodemailer, pdfkit, etc.) are
 # accessible to Node's module resolver — pnpm's virtual store alone is not enough.
-RUN pnpm --filter @workspace/api-server deploy --prod --legacy /deploy
+RUN pnpm --filter @workspace/api-server deploy --prod --legacy --ignore-scripts /deploy
 
 ### Stage 2: production image ───────────────────────────────────────────────────
 FROM node:24-alpine AS runner
