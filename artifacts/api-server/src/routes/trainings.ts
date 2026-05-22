@@ -343,10 +343,16 @@ router.post(
 
       const extractArchive = (): Promise<void> =>
         new Promise((resolve, reject) => {
+          let done = false;
+          const finish = () => { if (!done) { done = true; resolve(); } };
+          const timer = setTimeout(() => {
+            if (!done) { done = true; reject(new Error("SCORM extraction timed out")); }
+          }, 90_000);
           fs.createReadStream(req.file!.path)
             .pipe(unzipper.Extract({ path: scormDir }))
-            .on("close", resolve)
-            .on("error", reject);
+            .on("close", () => { clearTimeout(timer); finish(); })
+            .on("finish", () => { clearTimeout(timer); finish(); })
+            .on("error", (err) => { clearTimeout(timer); if (!done) { done = true; reject(err); } });
         });
 
       await validateArchive();
