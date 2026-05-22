@@ -60,17 +60,30 @@ function ContentViewer({ content, trainingId }: { content: TrainingContent; trai
     );
   }
 
-  if (content.type === "scorm" || content.type === "pptx") {
+  if (content.type === "scorm") {
     return (
       <div className="aspect-video w-full rounded-lg overflow-hidden border border-border">
         <iframe
-          src={`/api/uploads/${content.id}/index.html`}
+          src={`/api/uploads/scorm/${content.id}/index.html`}
           className="w-full h-full"
           title={content.title ?? "Content"}
           onLoad={handleIframeLoad}
           onError={() => {
             scormComplete.mutate({ id: trainingId, data: { contentId: content.id } });
           }}
+        />
+      </div>
+    );
+  }
+
+  if (content.type === "pptx" && content.url) {
+    return (
+      <div className="w-full rounded-lg overflow-hidden border border-border" style={{ height: "70vh" }}>
+        <iframe
+          src={content.url}
+          className="w-full h-full"
+          title={content.title ?? "Presentation"}
+          onLoad={handleIframeLoad}
         />
       </div>
     );

@@ -396,14 +396,39 @@ router.post(
       return;
     }
 
+    const pptxPath = req.file.path;
+    const pptxDir = path.dirname(pptxPath);
+    const baseName = path.basename(pptxPath, ".pptx");
+    const pdfFilename = `${baseName}.pdf`;
+    const pdfPath = path.join(pptxDir, pdfFilename);
+
+    let servedPath = pptxPath;
+    let servedUrl = `/api/uploads/pptx/${path.basename(pptxPath)}`;
+
+    try {
+      const { execFileSync } = await import("child_process");
+      execFileSync(
+        "soffice",
+        ["--headless", "--convert-to", "pdf", "--outdir", pptxDir, pptxPath],
+        { timeout: 120_000, env: { ...process.env, HOME: "/tmp" } },
+      );
+      if (fs.existsSync(pdfPath)) {
+        servedPath = pdfPath;
+        servedUrl = `/api/uploads/pptx/${pdfFilename}`;
+        fs.unlinkSync(pptxPath);
+      }
+    } catch (err) {
+      logger.error({ err }, "PPTX→PDF conversion failed, serving raw file");
+    }
+
     const [content] = await db
       .insert(trainingContentTable)
       .values({
         trainingId: id,
         type: "pptx",
         title: req.file.originalname.replace(/\.pptx$/i, ""),
-        filePath: req.file.path,
-        url: `/api/uploads/pptx/${path.basename(req.file.path)}`,
+        filePath: servedPath,
+        url: servedUrl,
       })
       .returning();
 

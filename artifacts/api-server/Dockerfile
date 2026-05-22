@@ -29,6 +29,8 @@ FROM node:24-alpine AS runner
 
 WORKDIR /app
 
+RUN apk add --no-cache libreoffice font-liberation ttf-dejavu font-noto
+
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Bundled server output
